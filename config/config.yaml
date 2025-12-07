@@ -1,0 +1,98 @@
+artifacts_root: artifacts
+
+# -------------------------------------------------------------------
+# DATA INGESTION
+# -------------------------------------------------------------------
+data_ingestion:
+  root_dir: artifacts/data_ingestion
+  source_path: data/raw/synth_dataset.json
+  local_data_file: artifacts/data_ingestion/raw_dataset.json
+
+# -------------------------------------------------------------------
+# DATA VALIDATION
+# -------------------------------------------------------------------
+data_validation:
+  root_dir: artifacts/data_validation
+  input_file: artifacts/data_ingestion/raw_dataset.json
+  schema_file: dataset_schema.yaml
+  status_file: artifacts/data_validation/status.txt
+
+# -------------------------------------------------------------------
+# DATA CLEANING
+# -------------------------------------------------------------------
+data_cleaning:
+  root_dir: artifacts/data_cleaning
+  input_file: artifacts/data_ingestion/raw_dataset.json
+  cleaned_file: artifacts/data_cleaning/cleaned_dataset.json
+
+# -------------------------------------------------------------------
+# DATA FORMATTING (SFT FORMAT)
+# -------------------------------------------------------------------
+data_formatting:
+  root_dir: artifacts/data_formatting
+  cleaned_file: artifacts/data_cleaning/cleaned_dataset.json
+  formatted_file: artifacts/data_formatting/sft_dataset.json
+
+# -------------------------------------------------------------------
+# DATA SPLITTING
+# -------------------------------------------------------------------
+data_split:
+  root_dir: artifacts/data_split
+  formatted_file: artifacts/data_formatting/sft_dataset.json
+  train_file: artifacts/data_split/train.json
+  test_file: artifacts/data_split/test.json
+  split_ratio: 0.90
+
+# -------------------------------------------------------------------
+# MODEL CONFIG
+# -------------------------------------------------------------------
+model:
+  root_dir: artifacts/model
+  base_model: "Qwen/Qwen2.5-1.5B"
+  tokenizer_name: "Qwen/Qwen2.5-1.5B"
+  output_dir: artifacts/model/lora
+  merged_model_dir: artifacts/model/merged
+
+# -------------------------------------------------------------------
+# TRAINING CONFIG
+# -------------------------------------------------------------------
+training:
+  root_dir: artifacts/training
+  train_data: artifacts/data_split/train.json
+  test_data: artifacts/data_split/test.json
+
+  epochs: 3
+  batch_size: 4
+  learning_rate: 2e-4
+  max_length: 1024
+
+  lora_r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  target_modules: ["q_proj", "v_proj"]
+
+# -------------------------------------------------------------------
+# MODEL EVALUATION
+# -------------------------------------------------------------------
+evaluation:
+  root_dir: artifacts/evaluation
+  test_data: artifacts/data_split/test.json
+  metrics_file: artifacts/evaluation/metrics.json
+
+# -------------------------------------------------------------------
+# INFERENCE CONFIG
+# -------------------------------------------------------------------
+inference:
+  root_dir: artifacts/inference
+  model_dir: artifacts/model/lora
+  merged_model_dir: artifacts/model/merged
+  max_tokens: 256
+
+# -------------------------------------------------------------------
+# LOGGING
+# -------------------------------------------------------------------
+logging:
+  training_log: logs/training/training.log
+  data_log: logs/data/data.log
+  inference_log: logs/inference/inference.log
+  system_log: logs/system/system.log

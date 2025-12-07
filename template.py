@@ -2,11 +2,17 @@ import os
 from pathlib import Path
 import logging
 
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s]: %(message)s:')
+# Logging config
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s]: %(message)s:'
+)
 
 project_name = "Reasona"
 
-# Logs folder structure ---------------------------------------------
+# ---------------------------------------------------------------------
+# LOGS FOLDER STRUCTURE
+# ---------------------------------------------------------------------
 logs_dirs = [
     "logs",
     "logs/training",
@@ -19,7 +25,31 @@ for log_dir in logs_dirs:
     os.makedirs(log_dir, exist_ok=True)
     logging.info(f"Created log directory: {log_dir}")
 
-# Project file structure ----------------------------------------------
+# ---------------------------------------------------------------------
+# ARTIFACTS FOLDER STRUCTURE
+# ---------------------------------------------------------------------
+artifacts_dirs = [
+    "artifacts",
+    "artifacts/data_ingestion",
+    "artifacts/data_validation",
+    "artifacts/data_cleaning",
+    "artifacts/data_formatting",
+    "artifacts/data_split",
+    "artifacts/training",
+    "artifacts/model",
+    "artifacts/model/lora",
+    "artifacts/model/merged",
+    "artifacts/evaluation",
+    "artifacts/inference",
+]
+
+for art_dir in artifacts_dirs:
+    os.makedirs(art_dir, exist_ok=True)
+    logging.info(f"Created artifacts directory: {art_dir}")
+
+# ---------------------------------------------------------------------
+# PROJECT FILE STRUCTURE
+# ---------------------------------------------------------------------
 list_of_files = [
     # Core project structure
     f"src/{project_name}/__init__.py",
@@ -83,7 +113,9 @@ list_of_files = [
     "README.md",
 ]
 
-# File creation loop ----------------------------------------------------
+# ---------------------------------------------------------------------
+# FILE CREATION LOOP
+# ---------------------------------------------------------------------
 for filepath in list_of_files:
     filepath = Path(filepath)
     filedir, filename = os.path.split(filepath)

@@ -17,4 +17,4 @@ seaborn
 plotly
 
 # MLOps / Experiment tracking
-mlflow==2.2.2
+mlflow

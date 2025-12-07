@@ -1,0 +1,29 @@
+Metadata-Version: 2.4
+Name: Reasona
+Version: 0.0.1
+Summary: Mini-GPT style reasoning and coding assistant
+Home-page: https://github.com/louayamor/Reasona
+Author: louayamor
+Author-email: amor.louay20@gmail.com
+Project-URL: Bug Tracker, https://github.com/louayamor/Reasona/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: torch
+Requires-Dist: transformers
+Requires-Dist: datasets
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: PyYAML
+Requires-Dist: flask
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: project-url
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

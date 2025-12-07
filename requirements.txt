@@ -1,0 +1,20 @@
+# Core dependencies
+numpy
+pandas
+PyYAML
+scikit-learn
+tqdm
+torch
+transformers
+datasets
+flask
+flask-cors
+joblib
+
+# Visualization
+matplotlib
+seaborn
+plotly
+
+# MLOps / Experiment tracking
+mlflow==2.2.2

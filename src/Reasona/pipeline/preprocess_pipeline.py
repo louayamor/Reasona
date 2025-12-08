@@ -1,5 +1,5 @@
 from Reasona.utils.logger import setup_logger
-from Reasona.config.configuration import ConfigurationManager
+from Reasona.config.config_manager import ConfigurationManager
 
 from Reasona.data.loader import combine_parquet_files, save_combined_data
 from Reasona.data.cleaner import DataCleaner

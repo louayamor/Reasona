@@ -1,0 +1,7 @@
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  batch_size: 2
+  epochs: 3
+  learning_rate: 2e-4

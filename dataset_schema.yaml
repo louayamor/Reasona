@@ -1,0 +1,18 @@
+COLUMNS:
+  synth_id: object
+  language: object
+  exercise: object
+  model: object
+  query: object
+  query_seed_url: object
+  query_seed_text: object
+  additional_seed_url: object
+  seed_license: object
+  constraints: object
+  script: object
+  synthetic_reasoning: object
+  synthetic_answer: object
+  words: int64
+
+TARGET_COLUMN:
+  name: synthetic_answer

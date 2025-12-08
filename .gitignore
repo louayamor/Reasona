@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+
+# Parquet data
+artifacts/data_ingestion/raw/
+artifacts/data_ingestion/combined/
+logs/

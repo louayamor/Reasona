@@ -52,11 +52,14 @@ def combine_parquet_files(limit=None):
     return combined_df
 
 
-def save_combined_data(df):
-    COMBINED_DIR.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Saving combined dataset to {COMBINED_FILE}")
-    df.to_parquet(COMBINED_FILE, index=False)
-    logger.info(f"Saved combined dataset successfully")
+def save_combined_data(df, out_path=None):
+    if out_path is None:
+        out_path = COMBINED_FILE
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Saving combined dataset to {out_path}")
+    df.to_parquet(out_path, index=False)
+    logger.info("Saved combined dataset successfully")
 
 
 if __name__ == "__main__":

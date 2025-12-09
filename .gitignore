@@ -6,6 +6,5 @@ __pycache__/
 venv/
 
 # Parquet data
-artifacts/data_ingestion/raw/
-artifacts/data_ingestion/combined/
+artifacts/
 logs/

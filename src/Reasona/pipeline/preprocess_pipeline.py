@@ -45,7 +45,7 @@ class PreprocessPipeline:
         cleaner = DataCleaner(df)
         df_clean = cleaner.clean()
 
-        out_path = self.pre_cfg.processed_dir / "clean.json"
+        out_path = self.pre_cfg.processed_dir / "data_clean.csv"
         cleaner.save(df_clean, out_path)
 
         logger.info(f"Cleaning completed. Cleaned rows: {len(df_clean)}")
@@ -62,7 +62,7 @@ class PreprocessPipeline:
         formatter = DataFormatter(df)
         dataset = formatter.to_instruction_format()
 
-        out_path = self.pre_cfg.merged_dir / "dataset.json"
+        out_path = self.pre_cfg.merged_dir / "dataset_transformed.csv"
         formatter.save(dataset, out_path)
 
         logger.info(f"Transformation completed. Output saved to {out_path}")

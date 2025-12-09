@@ -8,7 +8,7 @@ preprocess:
   limit: 50000
 
 training:
-  dataset_path: artifacts/preprocessing/merged/merged.jsonl
+  dataset_path: artifacts/preprocessing/merged/merged.csv
   output_dir: artifacts/training/
   base_model: mistral-7b-instruct
 

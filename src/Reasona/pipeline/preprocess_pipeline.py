@@ -13,9 +13,7 @@ class PreprocessPipeline:
         logger.info("Initializing PreprocessPipeline()")
 
         cfg = ConfigurationManager()
-        self.ingest_cfg = cfg.get_data_ingestion_config()
-        self.clean_cfg = cfg.get_data_cleaning_config()
-        self.transform_cfg = cfg.get_data_transformation_config()
+        self.pre_cfg = cfg.get_preprocess_config()
 
     # --------------------------------
     # 1. INGESTION
@@ -23,14 +21,19 @@ class PreprocessPipeline:
     def run_ingestion(self):
         logger.info("Running ingestion stage...")
 
-        df = combine_parquet_files(limit=100_000)
+        df = combine_parquet_files(limit=self.pre_cfg.limit)
 
-        if df.empty:
+        if df is None or df.empty:
             logger.error("Ingestion returned an empty DataFrame")
-        else:
-            logger.info(f"Ingestion loaded {len(df)} rows")
+            return df
 
-        save_combined_data(df)
+        logger.info(f"Ingestion loaded {len(df)} rows")
+
+        # Save combined raw data
+        out_path = self.pre_cfg.combined_dir / "combined.parquet"
+        save_combined_data(df, out_path)
+
+        logger.info(f"Combined dataset saved to {out_path}")
         return df
 
     # --------------------------------
@@ -42,10 +45,12 @@ class PreprocessPipeline:
         cleaner = DataCleaner(df)
         df_clean = cleaner.clean()
 
-        clean_path = self.clean_cfg.data_path
-        cleaner.save(df_clean, clean_path)
+        out_path = self.pre_cfg.processed_dir / "clean.json"
+        cleaner.save(df_clean, out_path)
 
         logger.info(f"Cleaning completed. Cleaned rows: {len(df_clean)}")
+        logger.info(f"Clean dataset saved to {out_path}")
+
         return df_clean
 
     # --------------------------------
@@ -57,10 +62,11 @@ class PreprocessPipeline:
         formatter = DataFormatter(df)
         dataset = formatter.to_instruction_format()
 
-        outfile = self.transform_cfg.data_path
-        formatter.save(dataset, outfile)
+        out_path = self.pre_cfg.merged_dir / "dataset.json"
+        formatter.save(dataset, out_path)
 
-        logger.info("Transformation completed.")
+        logger.info(f"Transformation completed. Output saved to {out_path}")
+
         return dataset
 
     # --------------------------------
@@ -70,6 +76,10 @@ class PreprocessPipeline:
         logger.info("=== PREPROCESSING PIPELINE STARTED ===")
 
         df_ingested = self.run_ingestion()
+        if df_ingested is None or df_ingested.empty:
+            logger.error("Stopping pipeline: ingestion returned no data.")
+            return
+
         df_cleaned = self.run_cleaning(df_ingested)
         self.run_transformation(df_cleaned)
 

@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import os
 
-logger = setup_logger("logs/data/data_loader.log")
+logger = setup_logger("logs/data/loader.log")
 
 RAW_DIR = Path("artifacts/data_ingestion/raw")
 COMBINED_DIR = Path("artifacts/data_ingestion/combined")

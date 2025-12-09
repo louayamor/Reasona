@@ -11,11 +11,8 @@ flask
 flask-cors
 joblib
 pyarrow
-
-# Visualization
+dvc
 matplotlib
 seaborn
 plotly
-
-# MLOps / Experiment tracking
 mlflow

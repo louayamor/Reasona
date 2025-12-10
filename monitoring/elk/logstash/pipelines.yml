@@ -1,0 +1,2 @@
+- pipeline.id: reasona-pipeline
+  path.config: "/usr/share/logstash/pipeline/logstash.conf"

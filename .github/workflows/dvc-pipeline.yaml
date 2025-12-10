@@ -41,13 +41,6 @@ jobs:
       - name: Install DVC + S3/HTTP support
         run: pip install dvc[http]
 
-      - name: Configure DVC remote
-        run: |
-          dvc remote modify dagshub url $DVC_REMOTE
-          dvc remote modify dagshub auth basic
-          dvc remote modify dagshub user $DAGSHUB_USER
-          dvc remote modify dagshub password $DAGSHUB_TOKEN
-
       - name: Run DVC pipeline
         run: dvc repro
 

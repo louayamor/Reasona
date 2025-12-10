@@ -34,5 +34,14 @@ services:
     depends_on:
       - elasticsearch
 
+  filebeat:
+    build: ../../exporters/filebeat
+    container_name: filebeat
+    volumes:
+      - ../../logs:/app/logs
+    depends_on:
+      - logstash
+
+
 volumes:
   esdata:

@@ -1,0 +1,53 @@
+name: DVC Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  run-dvc:
+    runs-on: ubuntu-latest
+
+    env:
+      DAGSHUB_USER: ${{ secrets.DAGSHUB_USER }}
+      DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+      DVC_REMOTE: "https://dagshub.com/${{ secrets.DAGSHUB_USER }}:${{ secrets.DAGSHUB_TOKEN }}/Reasona.dvc"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install DVC + S3/HTTP support
+        run: pip install dvc[http]
+
+      - name: Configure DVC remote
+        run: |
+          dvc remote modify dagshub url $DVC_REMOTE
+          dvc remote modify dagshub auth basic
+          dvc remote modify dagshub user $DAGSHUB_USER
+          dvc remote modify dagshub password $DAGSHUB_TOKEN
+
+      - name: Run DVC pipeline
+        run: dvc repro
+
+      - name: Push DVC artifacts to DagsHub
+        run: dvc push
+
+      - name: Commit updated dvc.lock
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git add dvc.lock
+          git diff --cached --quiet || git commit -m "ci: update dvc.lock after pipeline run"
+          git push

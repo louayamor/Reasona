@@ -7,7 +7,6 @@ venv/
 
 # Artifacts (ignore all actual data)
 artifacts/
-!artifacts.dvc
 
 # Logs
 logs/

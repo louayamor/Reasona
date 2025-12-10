@@ -5,20 +5,20 @@ stages:
       - src/Reasona/pipeline/preprocess_pipeline.py
       - config/config.yaml
     outs:
-      - artifacts/preprocessed
+      - artifacts/preprocessing
 
-  train:
-    cmd: python main.py --stage train
-    deps:
-      - artifacts/preprocessed
-      - src/Reasona/pipeline/training_pipeline.py
-    outs:
-      - artifacts/model
+#  train:
+#    cmd: python main.py --stage train
+#    deps:
+#      - artifacts/preprocessing
+#      - src/Reasona/pipeline/training_pipeline.py
+#    outs:
+#      - artifacts/training
 
-  evaluate:
-    cmd: python main.py --stage evaluate
-    deps:
-      - artifacts/model
-      - src/Reasona/pipeline/inference_pipeline.py
-    outs:
-      - artifacts/evaluation
+#  evaluate:
+#    cmd: python main.py --stage evaluate
+#    deps:
+#      - artifacts/training
+#      - src/Reasona/pipeline/inference_pipeline.py
+#    outs:
+#      - artifacts/evaluation

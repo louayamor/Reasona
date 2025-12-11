@@ -2,7 +2,8 @@ from Reasona.utils.logger import setup_logger
 import pandas as pd
 import json
 
-logger = setup_logger("logs/data/formatter.log")
+# Unique logger per module
+logger = setup_logger(__name__, "logs/data/formatter.log")
 
 
 class DataFormatter:
@@ -27,21 +28,21 @@ class DataFormatter:
                     "input": "",
                     "output": row["synthetic_answer"],
                     "metadata": {
-                        "id": row.get("synth_id", None),
-                        "model": row.get("model", None),
-                        "exercise": row.get("exercise", None),
-                        "script": row.get("script", None),
+                        "id": row.get("synth_id"),
+                        "model": row.get("model"),
+                        "exercise": row.get("exercise"),
+                        "script": row.get("script"),
                     },
                 }
                 formatted.append(item)
 
-                if i % 1000 == 0 and i > 0:
-                    logger.info(f"{i} rows processed")
+                if i > 0 and i % 1000 == 0:
+                    logger.info(f"{i} rows formatted")
 
             except Exception as e:
-                logger.error(f"Error formatting row {i}: {e}")
+                logger.exception(f"Error formatting row {i}: {e}")
 
-        logger.info(f"Completed formatting. Total formatted samples: {len(formatted)}")
+        logger.info(f"Formatting completed. Total samples formatted: {len(formatted)}")
         return formatted
 
     # ----------------------------------------
@@ -54,11 +55,10 @@ class DataFormatter:
             with open(file_path, "w", encoding="utf-8") as f:
                 for i, item in enumerate(dataset):
                     f.write(json.dumps(item, ensure_ascii=False) + "\n")
-
-                    if i % 5000 == 0 and i > 0:
+                    if i > 0 and i % 5000 == 0:
                         logger.info(f"{i} lines written")
 
             logger.info("Formatted dataset saved successfully")
 
         except Exception as e:
-            logger.error(f"Error saving file {file_path}: {e}")
+            logger.exception(f"Error saving file {file_path}: {e}")

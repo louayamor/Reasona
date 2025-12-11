@@ -1,9 +1,8 @@
 from Reasona.utils.logger import setup_logger
 from pathlib import Path
 import pandas as pd
-import os
 
-logger = setup_logger("logs/data/loader.log")
+logger = setup_logger(__name__, "logs/data/loader.log")
 
 RAW_DIR = Path("artifacts/data_ingestion/raw")
 COMBINED_DIR = Path("artifacts/data_ingestion/combined")

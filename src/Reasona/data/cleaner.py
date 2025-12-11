@@ -1,7 +1,8 @@
 from Reasona.utils.logger import setup_logger
 import pandas as pd
 
-logger = setup_logger("logs/data/cleaner.log")
+# Unique logger per module + separate log file
+logger = setup_logger(__name__, "logs/data/cleaner.log")
 
 
 class DataCleaner:
@@ -15,13 +16,12 @@ class DataCleaner:
     # ----------------------------------------
     def clean(self) -> pd.DataFrame:
         logger.info("Starting clean()")
-        logger.info("Performing cleaning operations")
 
         try:
             df = self.df.copy()
-            logger.info("Dataframe successfully copied")
+            logger.info("Dataframe copy successful")
         except Exception as e:
-            logger.error(f"Error copying dataframe: {e}")
+            logger.exception(f"Failed to copy dataframe: {e}")
             return pd.DataFrame()
 
         # -------------------------
@@ -33,26 +33,28 @@ class DataCleaner:
             after = len(df)
             logger.info(f"Duplicate rows removed: {before - after}")
         except Exception as e:
-            logger.error(f"Error removing duplicates: {e}")
+            logger.exception(f"Error removing duplicates: {e}")
 
         # -------------------------
         # Remove missing critical fields
         # -------------------------
         critical_cols = ["query", "synthetic_answer"]
-        missing_before = df[critical_cols].isna().any(axis=1).sum()
+
         try:
+            missing_before = df[critical_cols].isna().any(axis=1).sum()
             df = df.dropna(subset=critical_cols)
             missing_after = df[critical_cols].isna().any(axis=1).sum()
+
             logger.info(
-                f"Rows with missing critical fields removed: {missing_before - missing_after}"
+                f"Missing critical rows removed: {missing_before - missing_after}"
             )
         except Exception as e:
-            logger.error(f"Error dropping missing critical fields: {e}")
+            logger.exception(f"Error dropping missing critical fields: {e}")
 
         # -------------------------
         # Final summary
         # -------------------------
-        logger.info(f"Cleaning complete. Final shape: {df.shape}")
+        logger.info(f"Cleaning complete. Final dataframe shape: {df.shape}")
         return df
 
     # ----------------------------------------
@@ -60,10 +62,10 @@ class DataCleaner:
     # ----------------------------------------
     def save(self, df: pd.DataFrame, file_path):
         file_path = str(file_path)
-        logger.info(f"Saving cleaned dataset to {file_path}")
+        logger.info(f"Saving cleaned data to: {file_path}")
 
         try:
             df.to_parquet(file_path, index=False)
-            logger.info("Cleaned dataset saved successfully")
+            logger.info("Dataset saved successfully")
         except Exception as e:
-            logger.error(f"Error saving file {file_path}: {e}")
+            logger.exception(f"Error saving dataset to {file_path}: {e}")

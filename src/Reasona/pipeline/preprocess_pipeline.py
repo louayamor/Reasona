@@ -5,7 +5,7 @@ from Reasona.data.loader import combine_parquet_files, save_combined_data
 from Reasona.data.cleaner import DataCleaner
 from Reasona.data.formatter import DataFormatter
 
-logger = setup_logger("logs/pipeline/preprocess_pipeline.log")
+logger = setup_logger(__name__, "logs/pipeline/preprocess_pipeline.log")
 
 
 class PreprocessPipeline:
@@ -15,12 +15,8 @@ class PreprocessPipeline:
         cfg = ConfigurationManager()
         self.pre_cfg = cfg.get_preprocess_config()
 
-    # --------------------------------
-    # 1. INGESTION
-    # --------------------------------
     def run_ingestion(self):
         logger.info("Running ingestion stage...")
-
         df = combine_parquet_files(limit=self.pre_cfg.limit)
 
         if df is None or df.empty:
@@ -29,16 +25,12 @@ class PreprocessPipeline:
 
         logger.info(f"Ingestion loaded {len(df)} rows")
 
-        # Save combined raw data
         out_path = self.pre_cfg.combined_dir / "combined.parquet"
         save_combined_data(df, out_path)
 
         logger.info(f"Combined dataset saved to {out_path}")
         return df
 
-    # --------------------------------
-    # 2. CLEANING
-    # --------------------------------
     def run_cleaning(self, df):
         logger.info("Running cleaning stage...")
 
@@ -53,9 +45,6 @@ class PreprocessPipeline:
 
         return df_clean
 
-    # --------------------------------
-    # 3. TRANSFORMATION
-    # --------------------------------
     def run_transformation(self, df):
         logger.info("Running transformation stage...")
 
@@ -66,12 +55,8 @@ class PreprocessPipeline:
         formatter.save(dataset, out_path)
 
         logger.info(f"Transformation completed. Output saved to {out_path}")
-
         return dataset
 
-    # --------------------------------
-    # MAIN PIPELINE
-    # --------------------------------
     def run(self):
         logger.info("=== PREPROCESSING PIPELINE STARTED ===")
 

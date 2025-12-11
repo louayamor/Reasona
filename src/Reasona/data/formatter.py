@@ -3,7 +3,7 @@ import pandas as pd
 import json
 
 # Unique logger per module
-logger = setup_logger(__name__, "logs/data/formatter.log")
+logger = setup_logger(__name__, "logs/data/formatter.json")
 
 
 class DataFormatter:

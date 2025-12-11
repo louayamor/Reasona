@@ -2,7 +2,7 @@ from Reasona.utils.logger import setup_logger
 import pandas as pd
 
 # Unique logger per module + separate log file
-logger = setup_logger(__name__, "logs/data/cleaner.log")
+logger = setup_logger(__name__, "logs/data/cleaner.json")
 
 
 class DataCleaner:

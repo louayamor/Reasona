@@ -6,7 +6,7 @@ import joblib
 import pandas as pd
 
 
-logger = setup_logger("logs/pipeline/training_pipeline.log")
+logger = setup_logger("logs/pipeline/training_pipeline.json")
 
 
 class TrainingPipeline:

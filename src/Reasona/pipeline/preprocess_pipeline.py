@@ -5,7 +5,7 @@ from Reasona.data.loader import combine_parquet_files, save_combined_data
 from Reasona.data.cleaner import DataCleaner
 from Reasona.data.formatter import DataFormatter
 
-logger = setup_logger(__name__, "logs/pipeline/preprocess_pipeline.log")
+logger = setup_logger(__name__, "logs/pipeline/preprocess_pipeline.json")
 
 
 class PreprocessPipeline:

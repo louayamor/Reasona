@@ -1,9 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-# ----------------------------------------
-# Preprocessing Stage
-# ----------------------------------------
 @dataclass
 class PreprocessConfig:
     raw_dir: Path
@@ -12,10 +9,6 @@ class PreprocessConfig:
     merged_dir: Path
     limit: int | None = None
 
-
-# ----------------------------------------
-# Training Stage
-# ----------------------------------------
 @dataclass
 class TrainingConfig:
     dataset_path: Path
@@ -28,10 +21,6 @@ class TrainingConfig:
     epochs: int
     learning_rate: float
 
-
-# ----------------------------------------
-# Inference Stage
-# ----------------------------------------
 @dataclass
 class InferenceConfig:
     model_path: Path

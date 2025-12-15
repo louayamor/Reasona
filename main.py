@@ -1,6 +1,6 @@
 from Reasona.utils.logger import setup_logger
 from Reasona.pipeline.preprocess_pipeline import PreprocessPipeline
-##from Reasona.pipeline.training_pipeline import TrainingPipeline
+from Reasona.pipeline.training_pipeline import TrainingPipeline
 ##from Reasona.pipeline.inference_pipeline import InferencePipeline
 
 logger = setup_logger("main_pipeline", "logs/pipeline/main_pipeline.log")
@@ -18,5 +18,5 @@ def run_stage(stage_name, pipeline_cls):
 
 if __name__ == "__main__":
     run_stage("Preprocessing", PreprocessPipeline)
-    ##run_stage("Training", TrainingPipeline)
+    run_stage("Training", TrainingPipeline)
     ##run_stage("Inference", InferencePipeline)

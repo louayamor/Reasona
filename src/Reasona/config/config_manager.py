@@ -5,7 +5,6 @@ from Reasona.entities.config_entity import PreprocessConfig, TrainingConfig, Inf
 CONFIG_FILE_PATH = Path("config/config.yaml")
 PARAMS_FILE_PATH = Path("config/params.yaml")
 
-
 class ConfigurationManager:
     def __init__(
         self,
@@ -18,9 +17,6 @@ class ConfigurationManager:
         artifacts_root = Path(self.config.get("artifacts_root", "artifacts"))
         create_directories([artifacts_root])
 
-    # -------------------------------------------------------------
-    # PREPROCESS STAGE
-    # -------------------------------------------------------------
     def get_preprocess_config(self) -> PreprocessConfig:
         cfg = self.config["preprocess"]
 
@@ -28,7 +24,7 @@ class ConfigurationManager:
             Path(cfg["raw_dir"]),
             Path(cfg["combined_dir"]),
             Path(cfg["processed_dir"]),
-            Path(cfg["merged_dir"])
+            Path(cfg["merged_dir"]),
         ]
         create_directories(dirs)
 
@@ -40,9 +36,6 @@ class ConfigurationManager:
             limit=cfg.get("limit", None),
         )
 
-    # -------------------------------------------------------------
-    # TRAINING STAGE
-    # -------------------------------------------------------------
     def get_training_config(self) -> TrainingConfig:
         cfg = self.config["training"]
         params = self.params.get("lora", {})
@@ -51,7 +44,7 @@ class ConfigurationManager:
         create_directories([output_dir])
 
         return TrainingConfig(
-            dataset_path=Path(cfg["dataset_path"]),
+            transformed_data_path=Path(cfg["transformed_data_path"]),
             output_dir=output_dir,
             base_model=cfg.get("base_model"),
             lora_r=params.get("r"),
@@ -62,9 +55,7 @@ class ConfigurationManager:
             learning_rate=params.get("learning_rate"),
         )
 
-    # -------------------------------------------------------------
-    # INFERENCE STAGE
-    # -------------------------------------------------------------
+
     def get_inference_config(self) -> InferenceConfig:
         cfg = self.config["inference"]
 

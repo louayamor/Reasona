@@ -1,7 +1,6 @@
 from Reasona.utils.logger import setup_logger
 import pandas as pd
 
-# Unique logger per module + separate log file
 logger = setup_logger(__name__, "logs/data/cleaner.json")
 
 
@@ -11,9 +10,6 @@ class DataCleaner:
         logger.info(f"Input dataframe shape: {df.shape}")
         self.df = df
 
-    # ----------------------------------------
-    # CLEANING STEPS
-    # ----------------------------------------
     def clean(self) -> pd.DataFrame:
         logger.info("Starting clean()")
 
@@ -24,9 +20,6 @@ class DataCleaner:
             logger.exception(f"Failed to copy dataframe: {e}")
             return pd.DataFrame()
 
-        # -------------------------
-        # Remove duplicates
-        # -------------------------
         try:
             before = len(df)
             df = df.drop_duplicates()
@@ -35,9 +28,6 @@ class DataCleaner:
         except Exception as e:
             logger.exception(f"Error removing duplicates: {e}")
 
-        # -------------------------
-        # Remove missing critical fields
-        # -------------------------
         critical_cols = ["query", "synthetic_answer"]
 
         try:
@@ -51,15 +41,9 @@ class DataCleaner:
         except Exception as e:
             logger.exception(f"Error dropping missing critical fields: {e}")
 
-        # -------------------------
-        # Final summary
-        # -------------------------
         logger.info(f"Cleaning complete. Final dataframe shape: {df.shape}")
         return df
 
-    # ----------------------------------------
-    # SAVE CLEANED DATA
-    # ----------------------------------------
     def save(self, df: pd.DataFrame, file_path):
         file_path = str(file_path)
         logger.info(f"Saving cleaned data to: {file_path}")

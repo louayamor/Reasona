@@ -1,64 +1,76 @@
 from Reasona.utils.logger import setup_logger
+from typing import List, Dict
+from pathlib import Path
 import pandas as pd
 import json
 
-# Unique logger per module
 logger = setup_logger(__name__, "logs/data/formatter.json")
 
 
 class DataFormatter:
+    REQUIRED_COLUMNS = {"query", "synthetic_answer"}
+    OPTIONAL_COLUMNS = {"synth_id", "model", "exercise", "script"}
+
     def __init__(self, df: pd.DataFrame):
         logger.info("Initializing DataFormatter")
-        logger.info(f"Input dataframe shape: {df.shape}")
-        self.df = df
 
-    # ----------------------------------------
-    # FORMAT INTO INSTRUCTION FORMAT
-    # ----------------------------------------
-    def to_instruction_format(self):
-        logger.info("Starting to_instruction_format()")
-        logger.info(f"Formatting {len(self.df)} rows")
+        if df is None or df.empty:
+            raise ValueError("Input DataFrame is empty")
+
+        missing = self.REQUIRED_COLUMNS - set(df.columns)
+        if missing:
+            raise ValueError(f"Missing required columns: {missing}")
+
+        self.df = df.reset_index(drop=True)
+        logger.info(f"Input dataframe shape: {self.df.shape}")
+
+    def to_instruction_format(self) -> List[Dict]:
+        logger.info("Formatting dataset to instruction format")
 
         formatted = []
 
-        for i, row in self.df.iterrows():
+        for idx, row in enumerate(self.df.itertuples(index=False)):
             try:
                 item = {
-                    "instruction": row["query"],
+                    "instruction": getattr(row, "query"),
                     "input": "",
-                    "output": row["synthetic_answer"],
+                    "output": getattr(row, "synthetic_answer"),
                     "metadata": {
-                        "id": row.get("synth_id"),
-                        "model": row.get("model"),
-                        "exercise": row.get("exercise"),
-                        "script": row.get("script"),
+                        "id": getattr(row, "synth_id", None),
+                        "model": getattr(row, "model", None),
+                        "exercise": getattr(row, "exercise", None),
+                        "script": getattr(row, "script", None),
                     },
                 }
+
                 formatted.append(item)
 
-                if i > 0 and i % 1000 == 0:
-                    logger.info(f"{i} rows formatted")
+                if idx > 0 and idx % 1000 == 0:
+                    logger.info(f"{idx} samples formatted")
 
             except Exception as e:
-                logger.exception(f"Error formatting row {i}: {e}")
+                logger.exception(f"Failed to format row {idx}: {e}")
 
-        logger.info(f"Formatting completed. Total samples formatted: {len(formatted)}")
+        logger.info(f"Formatting completed: {len(formatted)} samples")
         return formatted
 
-    # ----------------------------------------
-    # SAVE TO JSONL
-    # ----------------------------------------
-    def save(self, dataset, file_path):
-        logger.info(f"Saving {len(dataset)} items to {file_path}")
+    def save_jsonl(self, dataset: List[Dict], path: Path) -> None:
+        if not dataset:
+            raise ValueError("Dataset is empty. Nothing to save.")
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Saving dataset to {path}")
 
         try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                for i, item in enumerate(dataset):
+            with open(path, "w", encoding="utf-8") as f:
+                for idx, item in enumerate(dataset):
                     f.write(json.dumps(item, ensure_ascii=False) + "\n")
-                    if i > 0 and i % 5000 == 0:
-                        logger.info(f"{i} lines written")
 
-            logger.info("Formatted dataset saved successfully")
+                    if idx > 0 and idx % 5000 == 0:
+                        logger.info(f"{idx} samples written")
+
+            logger.info("JSONL dataset saved successfully")
 
         except Exception as e:
-            logger.exception(f"Error saving file {file_path}: {e}")
+            logger.exception(f"Failed to save JSONL file: {e}")
+            raise

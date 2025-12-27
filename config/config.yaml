@@ -5,13 +5,13 @@ preprocess:
   combined_dir: artifacts/data_ingestion/combined
   processed_dir: artifacts/preprocessing/processed
   merged_dir: artifacts/preprocessing/merged
+  output_file: artifacts/preprocessing/merged/dataset_transformed.jsonl
   limit: 50000
 
 training:
-  transformed_data_path: artifacts/preprocessing/merged/dataset_transformed.csv
+  transformed_data_path: artifacts/preprocessing/merged/dataset_transformed.jsonl
   output_dir: artifacts/training/
   base_model: mistral-7b-instruct
-
 
 inference:
   model_path: artifacts/model/final

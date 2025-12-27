@@ -20,7 +20,7 @@ class TrainingPipeline:
             logger.error(f"Transformed dataset not found: {data_path}")
             return None
 
-        df = pd.read_csv(data_path)
+        df = pd.read_json(data_path, lines=True)
         logger.info(f"Loaded dataset with {len(df)} rows")
         return df
 

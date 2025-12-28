@@ -5,13 +5,19 @@ preprocess:
   combined_dir: artifacts/data_ingestion/combined
   processed_dir: artifacts/preprocessing/processed
   merged_dir: artifacts/preprocessing/merged
-  output_file: artifacts/preprocessing/merged/dataset_transformed.jsonl
   limit: 50000
 
 training:
   transformed_data_path: artifacts/preprocessing/merged/dataset_transformed.jsonl
   output_dir: artifacts/training/
   base_model: mistral-7b-instruct
+
+embedding:
+  dataset_path: artifacts/preprocessing/merged/dataset_transformed.jsonl
+  vector_db_dir: artifacts/vectorstore
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  chunk_size: 512
+  chunk_overlap: 50
 
 inference:
   model_path: artifacts/model/final

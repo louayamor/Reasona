@@ -3,6 +3,7 @@ from Reasona.utils.helpers import read_yaml, create_directories
 from Reasona.entities.config_entity import (
     PreprocessConfig,
     TrainingConfig,
+    EmbeddingConfig,
     InferenceConfig,
 )
 
@@ -22,6 +23,9 @@ class ConfigurationManager:
         artifacts_root = Path(self.config.get("artifacts_root", "artifacts"))
         create_directories([artifacts_root])
 
+    # -----------------------------
+    # PREPROCESS
+    # -----------------------------
     def get_preprocess_config(self) -> PreprocessConfig:
         cfg = self.config["preprocess"]
 
@@ -47,6 +51,9 @@ class ConfigurationManager:
             limit=cfg.get("limit"),
         )
 
+    # -----------------------------
+    # TRAINING (optional)
+    # -----------------------------
     def get_training_config(self) -> TrainingConfig:
         cfg = self.config["training"]
 
@@ -58,7 +65,27 @@ class ConfigurationManager:
             output_dir=output_dir,
             base_model=cfg["base_model"],
         )
-    
+
+    # -----------------------------
+    # EMBEDDING (RAG core)
+    # -----------------------------
+    def get_embedding_config(self) -> EmbeddingConfig:
+        cfg = self.config["embedding"]
+
+        vector_db_dir = Path(cfg["vector_db_dir"])
+        create_directories([vector_db_dir])
+
+        return EmbeddingConfig(
+            dataset_path=Path(cfg["dataset_path"]),
+            vector_db_dir=vector_db_dir,
+            embedding_model=cfg["embedding_model"],
+            chunk_size=cfg["chunk_size"],
+            chunk_overlap=cfg["chunk_overlap"],
+        )
+
+    # -----------------------------
+    # INFERENCE
+    # -----------------------------
     def get_inference_config(self) -> InferenceConfig:
         cfg = self.config["inference"]
 

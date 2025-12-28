@@ -18,6 +18,13 @@ class TrainingConfig:
     output_dir: Path
     base_model: str
 
+@dataclass(frozen=True)
+class EmbeddingConfig:
+    dataset_path: Path
+    vector_db_dir: Path
+    embedding_model: str
+    chunk_size: int
+    chunk_overlap: int
 
 @dataclass(frozen=True)
 class InferenceConfig:

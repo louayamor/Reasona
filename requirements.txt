@@ -15,4 +15,6 @@ matplotlib
 seaborn
 plotly
 python-json-logger
+sentence-transformers
+faiss-cpu
 # mlflow<3

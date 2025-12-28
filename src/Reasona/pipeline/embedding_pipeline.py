@@ -8,11 +8,7 @@ from Reasona.data.embedder import Embedder
 from Reasona.vectorstore.faiss_store import FaissStore
 from Reasona.utils.logger import setup_logger
 
-logger = setup_logger(
-    name="embedding_pipeline",
-    log_file="logs/pipeline/embedding_pipeline.json",
-)
-
+logger = setup_logger("embedding_pipeline", "logs/pipeline/embedding_pipeline.json")
 
 class EmbeddingPipeline:
     def __init__(self):
@@ -26,9 +22,6 @@ class EmbeddingPipeline:
 
         self.vector_db_dir.mkdir(parents=True, exist_ok=True)
 
-    # -----------------------------
-    # LOAD JSONL DATASET (STREAMING)
-    # -----------------------------
     def load_dataset(self) -> Iterable[dict]:
         logger.info(f"Loading dataset from {self.dataset_path}")
 

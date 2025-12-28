@@ -4,7 +4,7 @@
 
 ---
 
-## 🚀 Features
+## Features
 
 - **Data Ingestion**: Stream and combine large datasets efficiently, optimized for limited RAM (16GB tested).  
 - **Data Cleaning**: Remove duplicates, handle missing values, and preprocess data for downstream tasks.  
@@ -15,7 +15,7 @@
 
 ---
 
-## 💾 Project Structure
+## Project Structure
 
 ```
 Reasona/
@@ -47,7 +47,7 @@ Reasona/
 
 ---
 
-## ⚙️ Installation
+## Installation
 
 1. Clone the repository:
 
@@ -72,7 +72,7 @@ pip install -r requirements.txt
 
 ---
 
-## 💪 Usage
+## Usage
 
 ### Run Preprocessing Pipeline
 
@@ -97,14 +97,14 @@ python src/Reasona/pipeline/inference_pipeline.py
 
 ---
 
-## 🌐 Data Source
+## Data Source
 
 - The pipeline supports streaming large datasets directly from [Hugging Face Datasets](https://huggingface.co/datasets).  
 - Example dataset used: [`PleIAs/SYNTH`](https://huggingface.co/datasets/PleIAs/SYNTH)  
 
 ---
 
-## 👤 Author
+## Author
 
 **Louay Amor** – [GitHub](https://github.com/louayamor) | [LinkedIn](https://linkedin.com/in/louayamor)
 

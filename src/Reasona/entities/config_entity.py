@@ -8,7 +8,6 @@ class PreprocessConfig:
     combined_dir: Path
     processed_dir: Path
     merged_dir: Path
-    output_file: Path
     limit: int | None = None
 
 

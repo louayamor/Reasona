@@ -1,12 +1,12 @@
-# Python
+
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 venv/
 
-# Artifacts (ignore all actual data)
-artifacts/
 
-# Logs
+artifacts/*
+!artifacts/*.dvc
+
 logs/

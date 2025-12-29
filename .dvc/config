@@ -1,4 +1,6 @@
 [core]
-    remote = dagshub
+    remote = storage
 ['remote "dagshub"']
     url = https://louayamor:aadbef53704463ec06116cb8da8e66fa03f86aac@dagshub.com/louayamor/Reasona.dvc
+['remote "storage"']
+    url = ../artifacts

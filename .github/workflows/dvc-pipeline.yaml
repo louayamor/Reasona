@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-dvc:
+  dvc:
     runs-on: ubuntu-latest
 
     env:
@@ -15,12 +15,12 @@ jobs:
       DVC_REMOTE: "https://dagshub.com/${{ secrets.DAGSHUB_USER }}:${{ secrets.DAGSHUB_TOKEN }}/Reasona.dvc"
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           lfs: true
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
@@ -33,16 +33,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
-            pip install -r requirements.txt
-            pip install -e .
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
 
-      - name: Install DVC + S3/HTTP support
-        run: pip install dvc[http]
+      - name: Install DVC with HTTP support
+        run: pip install --upgrade "dvc[http]"
 
-      - name: Run DVC pipeline
-        run: dvc repro
+      - name: Configure DVC remote
+        run: dvc remote modify --local origin url ${{ env.DVC_REMOTE }}
+
+      - name: Reproduce DVC pipeline
+        run: dvc repro --no-commit
 
       - name: Push DVC artifacts to DagsHub
         run: dvc push

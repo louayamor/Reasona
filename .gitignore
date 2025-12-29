@@ -1,12 +1,32 @@
-
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.env
+*.venv
 venv/
+env/
+ENV/
+*.egg-info/
 
+.ipynb_checkpoints/
+
+logs/
+*.log
 
 artifacts/*
 !artifacts/*.dvc
 
-logs/
+.dvc/cache/
+
+.vscode/
+
+.idea/
+
+.DS_Store
+Thumbs.db
+
+*.tmp
+*.swp
+
+!data/*.dvc

@@ -1,8 +1,10 @@
-from Reasona.utils.logger import setup_logger
-from typing import List, Dict
 from pathlib import Path
-import pandas as pd
+from typing import List, Dict, Any
+
 import json
+import pandas as pd
+
+from Reasona.utils.logger import setup_logger
 
 logger = setup_logger(__name__, "logs/data/formatter.json")
 
@@ -12,65 +14,77 @@ class DataFormatter:
     OPTIONAL_COLUMNS = {"synth_id", "model", "exercise", "script"}
 
     def __init__(self, df: pd.DataFrame):
-        logger.info("Initializing DataFormatter")
+        self._validate_dataframe(df)
+        self.df = df.reset_index(drop=True)
+        logger.info(f"DataFormatter initialized | shape={self.df.shape}")
 
+    @staticmethod
+    def _validate_dataframe(df: pd.DataFrame) -> None:
         if df is None or df.empty:
-            raise ValueError("Input DataFrame is empty")
+            raise ValueError("Input DataFrame is empty or None")
 
-        missing = self.REQUIRED_COLUMNS - set(df.columns)
+        missing = DataFormatter.REQUIRED_COLUMNS - set(df.columns)
         if missing:
             raise ValueError(f"Missing required columns: {missing}")
 
-        self.df = df.reset_index(drop=True)
-        logger.info(f"Input dataframe shape: {self.df.shape}")
+    def to_instruction_format(self) -> List[Dict[str, Any]]:
+        logger.info("Converting dataframe to instruction format")
+        formatted: List[Dict[str, Any]] = []
 
-    def to_instruction_format(self) -> List[Dict]:
-        logger.info("Formatting dataset to instruction format")
+        columns = list(self.df.columns)
+        col_index = {col: idx for idx, col in enumerate(columns)}
 
-        formatted = []
-
-        for idx, row in enumerate(self.df.itertuples(index=False)):
+        for idx, row in enumerate(self.df.itertuples(index=False, name=None)):
             try:
-                item = {
-                    "instruction": getattr(row, "query"),
-                    "input": "",
-                    "output": getattr(row, "synthetic_answer"),
-                    "metadata": {
-                        "id": getattr(row, "synth_id", None),
-                        "model": getattr(row, "model", None),
-                        "exercise": getattr(row, "exercise", None),
-                        "script": getattr(row, "script", None),
-                    },
-                }
+                formatted.append(self._format_row(row, col_index))
 
-                formatted.append(item)
-
-                if idx > 0 and idx % 1000 == 0:
+                if idx > 0 and idx % 1_000 == 0:
                     logger.info(f"{idx} samples formatted")
 
             except Exception as e:
                 logger.exception(f"Failed to format row {idx}: {e}")
 
-        logger.info(f"Formatting completed: {len(formatted)} samples")
+        logger.info(f"Formatting completed | total_samples={len(formatted)}")
         return formatted
 
-    def save_jsonl(self, dataset: List[Dict], path: Path) -> None:
+    def _format_row(
+        self, row: tuple, col_index: Dict[str, int]
+    ) -> Dict[str, Any]:
+        return {
+            "instruction": row[col_index["query"]],
+            "input": "",
+            "output": row[col_index["synthetic_answer"]],
+            "metadata": self._extract_metadata(row, col_index),
+        }
+
+    def _extract_metadata(
+        self, row: tuple, col_index: Dict[str, int]
+    ) -> Dict[str, Any]:
+        metadata = {}
+        for col in self.OPTIONAL_COLUMNS:
+            metadata[col] = (
+                row[col_index[col]] if col in col_index else None
+            )
+        return metadata
+
+    @staticmethod
+    def save_jsonl(dataset: List[Dict[str, Any]], path: Path) -> None:
         if not dataset:
             raise ValueError("Dataset is empty. Nothing to save.")
 
         path.parent.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Saving dataset to {path}")
+        logger.info(f"Saving JSONL dataset | path={path}")
 
         try:
-            with open(path, "w", encoding="utf-8") as f:
+            with path.open("w", encoding="utf-8") as f:
                 for idx, item in enumerate(dataset):
                     f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
-                    if idx > 0 and idx % 5000 == 0:
+                    if idx > 0 and idx % 5_000 == 0:
                         logger.info(f"{idx} samples written")
 
             logger.info("JSONL dataset saved successfully")
 
         except Exception as e:
-            logger.exception(f"Failed to save JSONL file: {e}")
+            logger.exception("Failed to save JSONL file")
             raise

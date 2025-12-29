@@ -1,8 +1,10 @@
+from pathlib import Path
+import json
+import pandas as pd
+
 from Reasona.utils.logger import setup_logger
 from Reasona.config.config_manager import ConfigurationManager
-
-from Reasona.data.loader import combine_parquet_files, save_combined_data
-from Reasona.data.cleaner import DataCleaner
+from Reasona.data.loader import StreamingDatasetProcessor
 from Reasona.data.formatter import DataFormatter
 
 logger = setup_logger(__name__, "logs/pipeline/preprocess_pipeline.json")
@@ -11,61 +13,52 @@ logger = setup_logger(__name__, "logs/pipeline/preprocess_pipeline.json")
 class PreprocessPipeline:
     def __init__(self):
         logger.info("Initializing PreprocessPipeline")
+
         cfg = ConfigurationManager()
         self.pre_cfg = cfg.get_preprocess_config()
 
-    def run_ingestion(self):
-        logger.info("Stage: Ingestion")
+        self.output_path = self.pre_cfg.merged_dir / "dataset_transformed.jsonl"
+        self.output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        df = combine_parquet_files(limit=self.pre_cfg.limit)
-        if df is None or df.empty:
-            raise RuntimeError("Ingestion failed: empty DataFrame")
-
-        out_path = self.pre_cfg.combined_dir / "combined.parquet"
-        save_combined_data(df, out_path)
-
-        logger.info(f"Ingested {len(df)} rows")
-        return df
-
-    def run_cleaning(self, df):
-        logger.info("Stage: Cleaning")
-
-        cleaner = DataCleaner(df)
-        df_clean = cleaner.clean()
-
-        if df_clean.empty:
-            raise RuntimeError("Cleaning failed: empty DataFrame")
-
-        out_path = self.pre_cfg.processed_dir / "data_clean.csv"
-        cleaner.save(df_clean, out_path)
-
-        logger.info(f"Cleaned dataset saved to {out_path}")
-        return df_clean
-
-    def run_transformation(self, df):
-        logger.info("Stage: Transformation → JSONL")
-
-        formatter = DataFormatter(df)
-        dataset = formatter.to_instruction_format()
-
-        if not dataset:
-            raise RuntimeError("Transformation failed: no samples produced")
-
-        out_path = self.pre_cfg.merged_dir / "dataset_transformed.jsonl"
-        formatter.save_jsonl(dataset, out_path)
-
-        logger.info(f"Transformed dataset saved to {out_path}")
-        return out_path
+        self.processor = StreamingDatasetProcessor()
 
     def run(self):
         logger.info("=== PREPROCESSING PIPELINE STARTED ===")
 
-        df = self.run_ingestion()
-        df = self.run_cleaning(df)
-        self.run_transformation(df)
+        buffer = []
+        count = 0
 
+        for row in self.processor.stream_samples():
+            buffer.append(row)
+            count += 1
+
+            if len(buffer) >= 1000:
+                self._process_and_write(buffer)
+                buffer = []
+
+            if count % 5_000 == 0:
+                logger.info(f"{count} samples processed")
+
+            if self.pre_cfg.limit and count >= self.pre_cfg.limit:
+                logger.info(f"Limit reached: {self.pre_cfg.limit}")
+                break
+
+        if buffer:
+            self._process_and_write(buffer)
+
+        logger.info(f"Preprocessing finished. Total samples: {count}")
+        logger.info(f"Output saved to {self.output_path}")
         logger.info("=== PREPROCESSING PIPELINE FINISHED ===")
 
+    def _process_and_write(self, rows):
+        """
+        Format streamed rows and append to JSONL.
+        """
+        df = pd.DataFrame(rows)
+        formatter = DataFormatter(df)
 
-if __name__ == "__main__":
-    PreprocessPipeline().run()
+        formatted = formatter.to_instruction_format()
+
+        with open(self.output_path, "a", encoding="utf-8") as f:
+            for item in formatted:
+                f.write(json.dumps(item, ensure_ascii=False) + "\n")

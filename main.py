@@ -19,6 +19,6 @@ def run_stage(stage_name, pipeline_cls):
 
 if __name__ == "__main__":
     run_stage("Preprocessing", PreprocessPipeline)
-    run_stage("Training", TrainingPipeline)
-    run_stage("Embedding", EmbeddingPipeline)
+    ##run_stage("Training", TrainingPipeline)
+    ##run_stage("Embedding", EmbeddingPipeline)
     ##run_stage("Inference", InferencePipeline)

@@ -1,0 +1,10 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: python src/Reasona/data/loader.py
+    outs:
+    - path: artifacts/data_ingestion
+      hash: md5
+      md5: d751713988987e9331980363e24189ce.dir
+      size: 0
+      nfiles: 0

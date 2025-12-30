@@ -17,48 +17,39 @@ class PreprocessPipeline:
         cfg = ConfigurationManager()
         self.pre_cfg = cfg.get_preprocess_config()
 
-        self.output_path = self.pre_cfg.merged_dir / "dataset_transformed.jsonl"
-        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure output directories exist
+        self.pre_cfg.merged_dir.mkdir(parents=True, exist_ok=True)
 
-        self.processor = StreamingDatasetProcessor()
+        # Initialize robust streaming processor
+        self.processor = StreamingDatasetProcessor(
+            dataset_name="PleIAs/SYNTH",
+            output_file=self.pre_cfg.merged_dir / "dataset_transformed.jsonl",
+            timeout_per_sample=getattr(self.pre_cfg, "timeout_per_sample", 30),
+            max_retries=getattr(self.pre_cfg, "max_retries", 3),
+        )
 
     def run(self):
         logger.info("=== PREPROCESSING PIPELINE STARTED ===")
 
-        buffer = []
-        count = 0
+        # Stream dataset to JSONL with batching, retries, and timeout
+        output_file = self.processor.stream_to_jsonl(
+            split="train",
+            limit=self.pre_cfg.limit,
+            batch_size=1000
+        )
 
-        for row in self.processor.stream_samples():
-            buffer.append(row)
-            count += 1
+        logger.info(f"Initial streaming complete. File: {output_file}")
 
-            if len(buffer) >= 1000:
-                self._process_and_write(buffer)
-                buffer = []
-
-            if count % 5_000 == 0:
-                logger.info(f"{count} samples processed")
-
-            if self.pre_cfg.limit and count >= self.pre_cfg.limit:
-                logger.info(f"Limit reached: {self.pre_cfg.limit}")
-                break
-
-        if buffer:
-            self._process_and_write(buffer)
-
-        logger.info(f"Preprocessing finished. Total samples: {count}")
-        logger.info(f"Output saved to {self.output_path}")
-        logger.info("=== PREPROCESSING PIPELINE FINISHED ===")
-
-    def _process_and_write(self, rows):
-        """
-        Format streamed rows and append to JSONL.
-        """
-        df = pd.DataFrame(rows)
+        # Post-processing: apply DataFormatter for instruction format
+        df = pd.read_json(output_file, lines=True)
         formatter = DataFormatter(df)
-
         formatted = formatter.to_instruction_format()
 
-        with open(self.output_path, "a", encoding="utf-8") as f:
+        # Overwrite JSONL with formatted data
+        with open(output_file, "w", encoding="utf-8") as f:
             for item in formatted:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+        logger.info(f"Preprocessing finished. Total samples: {len(df)}")
+        logger.info(f"Output saved to {output_file}")
+        logger.info("=== PREPROCESSING PIPELINE FINISHED ===")

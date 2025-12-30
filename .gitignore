@@ -14,10 +14,11 @@ ENV/
 logs/
 *.log
 
-artifacts/*
-!artifacts/*.dvc
-
+artifacts/
+!dvc.yaml
+!dvc.lock
 .dvc/cache/
+.dvc/tmp/
 
 .vscode/
 

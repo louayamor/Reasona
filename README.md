@@ -1,17 +1,18 @@
 # Reasona
 
-**Reasona** is a modular AI/ML pipeline framework designed for processing, cleaning, transforming, and training on synthetic datasets. It provides end-to-end capabilities for data ingestion, preprocessing, model training, and inference with structured configuration.
+**Reasona** is a modular AI/ML pipeline framework designed for **streaming, preprocessing, embedding, indexing, training, and inference** on synthetic datasets. It provides end-to-end capabilities for data ingestion, cleaning, transformation, model training, vector-based retrieval, and inference with structured configuration.
 
 ---
 
 ## Features
 
-- **Data Ingestion**: Stream and combine large datasets efficiently, optimized for limited RAM (16GB tested).  
-- **Data Cleaning**: Remove duplicates, handle missing values, and preprocess data for downstream tasks.  
-- **Data Transformation**: Format datasets into instruction-based formats suitable for model training.  
-- **Training & Fine-Tuning**: Support for LoRA-based fine-tuning pipelines.  
-- **Inference**: Flexible inference engine integration with customizable parameters.  
-- **Configuration Management**: Centralized YAML-based configuration for preprocessing, training, and inference.  
+* **Streaming Data Ingestion**: Stream large datasets directly from [Hugging Face Datasets].
+* **Data Cleaning & Transformation**: Remove duplicates, handle missing values, and format data into instruction-based JSON suitable for training or embedding.
+* **Indexing & Embedding**: Chunk and embed streaming data using [SentenceTransformers] and store embeddings in [FAISS].
+* **Retrieval & Inference**: Perform vector-based retrieval with top-k search; support transformer-based inference pipelines.
+* **Training & Fine-Tuning**: LoRA-based fine-tuning support for custom models.
+* **Configuration Management**: Centralized YAML configuration for preprocessing, indexing, retrieval, training, and inference.
+* **Modular Architecture**: Clear separation between **producer (preprocessing)** and **consumer (indexing/inference)** pipelines for scalable streaming workflows.
 
 ---
 
@@ -26,22 +27,26 @@ Reasona/
 │       │   ├── config_manager.py
 │       │   └── params.yaml
 │       ├── data/
-│       │   ├── loader.py
-│       │   ├── cleaner.py
-│       │   ├── formatter.py
+│       │   ├── loader.py          # StreamingDatasetProcessor
+│       │   ├── cleaner.py         # Data cleaning utilities
+│       │   ├── formatter.py       # DataFormatter
+│       │   ├── chunker.py         # TextChunker for embeddings
 │       │   └── __init__.py
 │       ├── pipeline/
-│       │   ├── preprocess_pipeline.py
-│       │   ├── training_pipeline.py
-│       │   └── inference_pipeline.py
+│       │   ├── preprocess_pipeline.py  # Producer
+│       │   ├── indexing_pipeline.py    # Consumer
+│       │   ├── training_pipeline.py    # Training
+│       │   └── inference_pipeline.py   # Inference / Retrieval
+│       ├── vectorstore/
+│       │   └── faiss_store.py          # FAISS integration
 │       └── utils/
-│           ├── logger.py
-│           └── helpers.py
+│           ├── logger.py               # Logging
+│           └── helpers.py              # Utility helpers
 ├── config/
 │   ├── config.yaml
 │   └── params.yaml
-├── artifacts/                # Generated datasets and outputs
-├── main.py                   # Entry point to run pipelines
+├── artifacts/                # Saved models, embeddings, vector stores
+├── main.py                   # Entry point for streaming + indexing pipelines
 └── README.md
 ```
 
@@ -52,7 +57,7 @@ Reasona/
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/Reasona.git
+git clone https://github.com/louayamor/Reasona.git
 cd Reasona
 ```
 
@@ -72,23 +77,56 @@ pip install -r requirements.txt
 
 ---
 
+## Configuration
+
+All pipelines are controlled via `config/config.yaml` and `config/params.yaml`.
+
+Key sections:
+
+* **preprocess**: dataset name, split, max samples, batch size.
+* **embedding**: embedding model, chunk size/overlap, vector store directory.
+* **retrieval**: top-k results, embedding model, vector store directory.
+* **inference**: model path, tokenizer path, engine type, max tokens, temperature.
+
+Example `preprocess` section:
+
+```yaml
+preprocess:
+  dataset_name: "PleIAs/SYNTH"
+  split: "train"
+  revision: "main"
+  max_samples: 10000
+  batch_size: 500
+```
+
+---
+
 ## Usage
 
-### Run Preprocessing Pipeline
+### Run Preprocessing + Indexing (Producer → Consumer)
 
 ```bash
 python main.py
 ```
 
-This will execute the preprocessing pipeline including:
+Pipeline flow:
 
-1. **Data Ingestion** – combining dataset files (streaming from Hugging Face if configured).  
-2. **Data Cleaning** – removing duplicates and handling missing values.  
-3. **Data Transformation** – formatting into instruction-based JSON for training.  
+1. **Preprocessing Pipeline (Producer)**
 
-### Training and Inference
+   * Streams data from Hugging Face.
+   * Cleans and formats into instruction-based JSON.
 
-After preprocessing, configure `config.yaml` and `params.yaml` for model training or inference pipelines. Then run:
+2. **Indexing Pipeline (Consumer)**
+
+   * Chunks streamed data using `TextChunker`.
+   * Embeds chunks using `SentenceTransformers`.
+   * Stores vectors in FAISS for later retrieval.
+
+> The pipelines are **streaming-first**, avoiding intermediate file storage.
+
+### Training & Inference
+
+Configure `config.yaml` and `params.yaml` for your model, then run:
 
 ```bash
 python src/Reasona/pipeline/training_pipeline.py
@@ -97,14 +135,34 @@ python src/Reasona/pipeline/inference_pipeline.py
 
 ---
 
-## Data Source
+## Supported Datasets
 
-- The pipeline supports streaming large datasets directly from [Hugging Face Datasets](https://huggingface.co/datasets).  
-- Example dataset used: [`PleIAs/SYNTH`](https://huggingface.co/datasets/PleIAs/SYNTH)  
+* Hugging Face Datasets (streamable).
+* [`PleIAs/SYNTH`](https://huggingface.co/datasets/PleIAs/SYNTH).
+
+---
+
+## Logging
+
+All pipelines produce **JSON-based logs**:
+
+* `logs/pipeline/preprocess_pipeline.json`
+* `logs/pipeline/indexing_pipeline.json`
+* `logs/pipeline/main_pipeline.log`
+
+---
+
+## Tools & Libraries Used
+
+* **Python 3.10+**
+* [Hugging Face Datasets](https://huggingface.co/docs/datasets) – streaming large datasets
+* [SentenceTransformers](https://www.sbert.net/) – embeddings
+* [FAISS](https://github.com/facebookresearch/faiss) – vector storage and search
+* [PyYAML](https://pyyaml.org/) – configuration
+* [LoRA / Transformers](https://huggingface.co/docs/transformers/) – model training & fine-tuning
 
 ---
 
 ## Author
 
 **Louay Amor** – [GitHub](https://github.com/louayamor) | [LinkedIn](https://linkedin.com/in/louayamor)
-

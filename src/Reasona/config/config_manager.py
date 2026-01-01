@@ -3,7 +3,7 @@ from Reasona.utils.helpers import read_yaml
 from Reasona.entities.config_entity import (
     PreprocessConfig,
     TrainingConfig,
-    EmbeddingConfig,
+    IndexingConfig,
     InferenceConfig,
 )
 from Reasona.config.validators import require
@@ -47,13 +47,13 @@ class ConfigurationManager:
             base_model=require(cfg, "base_model", "training"),
         )
 
-    # ---------- EMBEDDING / INDEXING ----------
-    def get_embedding_config(self) -> EmbeddingConfig:
-        cfg = self.config.get("embedding")
+    # ---------- INDEXING ----------
+    def get_indexing_config(self) -> IndexingConfig:
+        cfg = self.config.get("indexing")
         if not cfg:
-            raise ValueError("Missing 'embedding' section in config.yaml")
+            raise ValueError("Missing 'indexing' section in config.yaml")
 
-        return EmbeddingConfig(
+        return IndexingConfig(
             dataset_path=Path(cfg["dataset_path"]) if cfg.get("dataset_path") else None,
             vector_store_dir=Path(cfg.get("vector_store_dir", "artifacts/vectors")),
             embedding_model=cfg.get("embedding_model", "all-MiniLM-L6-v2"),

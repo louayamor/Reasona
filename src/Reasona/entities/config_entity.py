@@ -30,8 +30,8 @@ class TrainingConfig:
 # Embedding / Indexing configuration
 # -----------------------------
 @dataclass(frozen=True)
-class EmbeddingConfig:
-    dataset_path: Optional[Path] = None    # path to JSONL or streamed dataset
+class IndexingConfig:
+    dataset_path: Optional[Path] = None    
     vector_store_dir: Path = Path("artifacts/vectors")
     embedding_model: str = "all-MiniLM-L6-v2"
     chunk_size: int = 256

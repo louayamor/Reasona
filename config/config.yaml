@@ -12,7 +12,7 @@ training:
   output_dir: artifacts/training
   base_model: mistral-7b-instruct
 
-embedding:
+indexing:
   dataset_path: artifacts/preprocessing/merged/dataset_transformed.jsonl
   vector_db_dir: artifacts/vectorstore
   embedding_model: sentence-transformers/all-MiniLM-L6-v2

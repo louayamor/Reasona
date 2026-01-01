@@ -9,38 +9,53 @@ logger = setup_logger(__name__, "logs/data/loader.json")
 
 class StreamingDatasetProcessor:
     """
-    Hugging Face streaming-only processor.
-    - No disk writes
-    - Sample-level streaming
-    - Safe for inference / retriever ingestion
+    Hugging Face dataset processor with:
+    - One-time metadata warmup (non-streaming)
+    - True sample-level streaming
     """
 
     def __init__(
         self,
-        dataset_name: str = "PleIAs/SYNTH",
+        dataset_name: str,
         revision: str = "main",
+        cache_dir: str | None = None,
     ):
+        if not isinstance(dataset_name, str):
+            raise ValueError("dataset_name must be a string")
+
         self.dataset_name = dataset_name
         self.revision = revision
+        self.cache_dir = cache_dir
 
-    def _load_stream(self, split: str):
-        logger.info(f"Starting stream | dataset={self.dataset_name}, split={split}")
-        return load_dataset(
+        self._warmup_metadata()
+
+    def _warmup_metadata(self) -> None:
+        """
+        Downloads dataset metadata once to reduce first-stream latency.
+        """
+        logger.info("Warming up dataset metadata (one-time)")
+        load_dataset(
             self.dataset_name,
-            split=split,
-            streaming=True,
+            split="train",
+            streaming=False,
             revision=self.revision,
+            cache_dir=self.cache_dir,
         )
 
-    # ------------------------------------------------------------------
-    # SAMPLE STREAM (MiniGPT / inference / retriever)
-    # ------------------------------------------------------------------
     def stream_samples(
         self,
         split: str = "train",
         max_samples: Optional[int] = None,
     ) -> Iterator[Dict[str, Any]]:
-        dataset = self._load_stream(split)
+        logger.info(f"Starting stream | dataset={self.dataset_name}, split={split}")
+
+        dataset = load_dataset(
+            self.dataset_name,
+            split=split,
+            streaming=True,
+            revision=self.revision,
+            cache_dir=self.cache_dir,
+        )
 
         started = False
         start_time = time.time()

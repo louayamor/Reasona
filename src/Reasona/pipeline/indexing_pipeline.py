@@ -1,71 +1,87 @@
+from pathlib import Path
+from queue import Queue
+from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
+from typing import Optional
+
 from Reasona.utils.logger import setup_logger
+from Reasona.pipeline.preprocess_pipeline import PreprocessPipeline
 from Reasona.data.chunker import TextChunker
 from Reasona.data.embedder import Embedder
 from Reasona.vectorstore.faiss_store import FaissStore
-from Reasona.pipeline.preprocess_pipeline import PreprocessPipeline
-from Reasona.entities.config_entity import PreprocessConfig, IndexingConfig
 
 logger = setup_logger("indexing_pipeline", "logs/pipeline/indexing_pipeline.json")
 
 
 class IndexingPipeline:
     """
-    Consumer pipeline.
-    Consumes a preprocessing stream and builds a vector index.
+    Streaming consumer pipeline.
+    Consumes preprocessed samples and builds a FAISS vector store.
     """
 
     def __init__(
         self,
-        preprocess_cfg: PreprocessConfig,
-        indexing_cfg: IndexingConfig,
+        preprocess_pipeline: PreprocessPipeline,
+        chunker: TextChunker,
+        embedder: Embedder,
+        vector_db_dir: Path,
+        workers: int = 2,
+        queue_size: int = 100,
     ):
-        logger.info("Initializing IndexingPipeline (consumer)")
-
-        self.preprocess_cfg = preprocess_cfg
-        self.indexing_cfg = indexing_cfg
-
-        self.vector_db_dir = indexing_cfg.vector_store_dir
+        self.preprocess_pipeline = preprocess_pipeline
+        self.chunker = chunker
+        self.embedder = embedder
+        self.vector_db_dir = Path(vector_db_dir)
         self.vector_db_dir.mkdir(parents=True, exist_ok=True)
 
-        self.chunker = TextChunker(
-            chunk_size=indexing_cfg.chunk_size,
-            chunk_overlap=indexing_cfg.chunk_overlap,
-        )
-
-        self.embedder = Embedder(model_name=indexing_cfg.embedding_model)
+        self.workers = workers
+        self.queue = Queue(maxsize=queue_size)
 
     def run(self) -> None:
         logger.info("=== INDEXING PIPELINE STARTED ===")
 
-        # ---- producer ----
-        preprocess = PreprocessPipeline(self.preprocess_cfg)
-        stream = preprocess.stream()
+        store: Optional[FaissStore] = None
 
-        store: FaissStore | None = None
-        processed = 0
+        # ---------------- PRODUCER ----------------
+        def producer():
+            for sample in self.preprocess_pipeline.stream():
+                chunks = self.chunker.chunk_text(
+                    sample["text"],
+                    metadata=sample.get("metadata"),
+                )
+                if chunks:
+                    self.queue.put(chunks)
 
-        for sample in stream:
-            chunks = self.chunker.chunk_text(
-                sample["text"],
-                metadata=sample.get("metadata"),
-            )
+            # signal termination
+            for _ in range(self.workers):
+                self.queue.put(None)
 
-            if not chunks:
-                continue
+        # ---------------- CONSUMER ----------------
+        def consumer():
+            nonlocal store
 
-            texts = [c["text"] for c in chunks]
-            metadatas = [c["metadata"] for c in chunks]
+            while True:
+                chunks = self.queue.get()
+                if chunks is None:
+                    break
 
-            vectors = self.embedder.embed(texts)
+                texts = [c["text"] for c in chunks]
+                metadatas = [c["metadata"] for c in chunks]
 
-            if store is None:
-                store = FaissStore(dim=vectors.shape[1])
+                vectors = self.embedder.embed(texts)
 
-            store.add(vectors, metadatas)
+                if store is None:
+                    store = FaissStore(dim=vectors.shape[1])
 
-            processed += 1
-            if processed % 100 == 0:
-                logger.info(f"Indexed {processed} streamed samples")
+                store.add(vectors, metadatas)
+
+        # start producer
+        Thread(target=producer, daemon=True).start()
+
+        # start consumers
+        with ThreadPoolExecutor(max_workers=self.workers) as executor:
+            for _ in range(self.workers):
+                executor.submit(consumer)
 
         if store is not None:
             store.save(self.vector_db_dir)

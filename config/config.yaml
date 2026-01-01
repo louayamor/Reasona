@@ -1,11 +1,12 @@
 artifacts_root: artifacts
 
 preprocess:
-  raw_dir: artifacts/data_ingestion/raw
-  combined_dir: artifacts/data_ingestion/combined
-  processed_dir: artifacts/preprocessing/processed
-  merged_dir: artifacts/preprocessing/merged
-  limit: 50000
+  dataset_name: PleIAs/SYNTH
+  split: train
+  revision: main
+  max_samples: null
+  cache_dir: ~/.cache/huggingface/datasets
+
 
 training:
   transformed_data_path: artifacts/preprocessing/merged/dataset_transformed.jsonl

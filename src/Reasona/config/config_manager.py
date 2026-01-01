@@ -32,7 +32,6 @@ class ConfigurationManager:
             split=cfg.get("split", "train"),
             revision=cfg.get("revision", "main"),
             max_samples=cfg.get("max_samples"),
-            batch_size=cfg.get("batch_size", 500),
         )
 
     # ---------- TRAINING ----------

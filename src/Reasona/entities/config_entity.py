@@ -8,12 +8,11 @@ from typing import Optional
 # -----------------------------
 @dataclass(frozen=True)
 class PreprocessConfig:
-    dataset_name: str = "PleIAs/SYNTH"    # HuggingFace dataset name
-    split: str = "train"                  # dataset split to stream
-    revision: str = "main"                # optional HF revision
-    max_samples: Optional[int] = None     # optional max samples to stream
-    batch_size: int = 500                 # logging / flush batch size
-    output_dir: Optional[Path] = None     # optional directory to save intermediate results
+    dataset_name: str
+    split: str
+    revision: str
+    max_samples: Optional[int] = None
+    cache_dir: Optional[str] = None
 
 
 # -----------------------------

@@ -20,6 +20,8 @@ artifacts/
 .dvc/cache/
 .dvc/tmp/
 
+data_cache/
+
 .vscode/
 
 .idea/

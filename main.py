@@ -1,35 +1,32 @@
 from pathlib import Path
-
 from Reasona.config.config_manager import ConfigurationManager
 from Reasona.pipeline.preprocess_pipeline import PreprocessPipeline
 from Reasona.pipeline.indexing_pipeline import IndexingPipeline
-from Reasona.data.chunker import TextChunker
 from Reasona.data.embedder import Embedder
 
-
 def main():
-    # Load configs from ConfigurationManager
-    cfg_manager = ConfigurationManager()
-    preprocess_cfg = cfg_manager.get_preprocess_config()
-    indexing_cfg = cfg_manager.get_indexing_config()
+    cfg = ConfigurationManager()
+    preprocess_cfg = cfg.get_preprocess_config()
+    indexing_cfg = cfg.get_indexing_config()
 
+    # streaming producer
     preprocess_pipeline = PreprocessPipeline(preprocess_cfg)
 
-    chunker = TextChunker(
-        chunk_size=indexing_cfg.chunk_size,
-        chunk_overlap=indexing_cfg.chunk_overlap,
-    )
-    embedder = Embedder(model_name=indexing_cfg.embedding_model)
-
+    # indexing (consumer)
+    embedder = Embedder(indexing_cfg.embedding_model)
     indexing_pipeline = IndexingPipeline(
-        preprocess_pipeline=preprocess_pipeline,
-        chunker=chunker,
         embedder=embedder,
         vector_db_dir=indexing_cfg.vector_store_dir,
-        workers=4,  
+        workers=indexing_cfg.workers,
+        batch_size=indexing_cfg.batch_size,
     )
 
-    indexing_pipeline.run()
+    indexing_pipeline.start()
+
+    for sample in preprocess_pipeline.stream():
+        indexing_pipeline.index_chunks(sample)
+
+    indexing_pipeline.stop()
 
 
 if __name__ == "__main__":

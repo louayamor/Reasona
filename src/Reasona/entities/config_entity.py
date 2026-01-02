@@ -15,6 +15,7 @@ class PreprocessConfig:
     cache_dir: Optional[str] = None
 
 
+
 # -----------------------------
 # Training configuration
 # -----------------------------
@@ -35,7 +36,8 @@ class IndexingConfig:
     embedding_model: str = "all-MiniLM-L6-v2"
     chunk_size: int = 256
     chunk_overlap: int = 32
-
+    workers: int = 2
+    batch_size: int = 64
 
 # -----------------------------
 # Retrieval / Inference configuration

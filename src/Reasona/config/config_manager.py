@@ -21,7 +21,6 @@ class ConfigurationManager:
         self.config = read_yaml(config_filepath)
         self.params = read_yaml(params_filepath)
 
-    # ---------- PREPROCESS (Streaming) ----------
     def get_preprocess_config(self) -> PreprocessConfig:
         cfg = self.config.get("preprocess")
         if not cfg:
@@ -30,11 +29,11 @@ class ConfigurationManager:
         return PreprocessConfig(
             dataset_name=cfg.get("dataset_name", "PleIAs/SYNTH"),
             split=cfg.get("split", "train"),
-            revision=cfg.get("revision", "main"),
             max_samples=cfg.get("max_samples"),
+            revision=cfg.get("revision", "main"),
+            cache_dir=cfg.get("cache_dir"),
         )
 
-    # ---------- TRAINING ----------
     def get_training_config(self) -> TrainingConfig:
         cfg = self.config.get("training")
         if not cfg:
@@ -46,7 +45,6 @@ class ConfigurationManager:
             base_model=require(cfg, "base_model", "training"),
         )
 
-    # ---------- INDEXING ----------
     def get_indexing_config(self) -> IndexingConfig:
         cfg = self.config.get("indexing")
         if not cfg:
@@ -58,9 +56,10 @@ class ConfigurationManager:
             embedding_model=cfg.get("embedding_model", "all-MiniLM-L6-v2"),
             chunk_size=int(cfg.get("chunk_size", 256)),
             chunk_overlap=int(cfg.get("chunk_overlap", 32)),
+            workers=int(cfg.get("workers", 2)),
+            batch_size=int(cfg.get("batch_size", 64)),
         )
 
-    # ---------- INFERENCE ----------
     def get_inference_config(self) -> InferenceConfig:
         cfg = self.config.get("inference")
         if not cfg:

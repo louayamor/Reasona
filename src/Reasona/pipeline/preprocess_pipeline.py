@@ -1,5 +1,5 @@
-from typing import Iterator, Dict, Any
 from pathlib import Path
+from typing import Iterator, Dict, Any
 from Reasona.utils.logger import setup_logger
 from Reasona.data.loader import StreamingDatasetProcessor
 from Reasona.data.formatter import DataFormatter
@@ -9,19 +9,16 @@ logger = setup_logger(__name__, "logs/pipeline/preprocess_pipeline.json")
 
 
 class PreprocessPipeline:
-    """
-    Streaming data PRODUCER.
-    Yields preprocessed samples one-by-one.
-    """
 
-    def __init__(self, cfg: PreprocessConfig, cache_dir: Path = Path("./data_cache")):
+    def __init__(self, cfg: PreprocessConfig):
         logger.info("Initializing PreprocessPipeline (stream producer)")
         self.cfg = cfg
 
         self.loader = StreamingDatasetProcessor(
             dataset_name=cfg.dataset_name,
-            revision=cfg.revision,
             cache_dir=cfg.cache_dir,
+            revision=cfg.revision,
+            
         )
 
         self.formatter = DataFormatter()
@@ -31,7 +28,7 @@ class PreprocessPipeline:
 
         stream = self.loader.stream_samples(
             split=self.cfg.split,
-            max_samples=self.cfg.max_samples,
+            max_samples=None  
         )
 
         for idx, raw_sample in enumerate(stream, start=1):

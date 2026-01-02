@@ -14,7 +14,7 @@ class InferencePipeline:
     def __init__(self, retrieval_pipeline: RetrievalPipeline, cfg: InferenceConfig, model=None):
         self.retrieval = retrieval_pipeline
         self.cfg = cfg
-        self.model = model  # Any callable that takes a prompt and returns output
+        self.model = model
 
     def generate_prompt(self, user_prompt: str, top_k_contexts: List[Dict]) -> str:
         """

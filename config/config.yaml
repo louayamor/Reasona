@@ -7,24 +7,30 @@ preprocess:
   max_samples: null
   cache_dir: ~/.cache/huggingface/datasets
 
+  # Streaming optimization
+  buffer_size: 10000
+  prefetch_buffer: 500          # optional, default in dataclass
+  block_size: 128MiB            # optional, default in dataclass
+  num_workers: 2                # optional, default in dataclass
 
 training:
-  transformed_data_path: artifacts/preprocessing/merged/dataset_transformed.jsonl
-  output_dir: artifacts/training
-  base_model: mistral-7b-instruct
+  dataset_path: artifacts/dataset
+  output_dir: artifacts/models
+  base_model: sentence-transformers/all-MiniLM-L6-v2
 
 indexing:
-  dataset_path: artifacts/preprocessing/merged/dataset_transformed.jsonl
-  vector_db_dir: artifacts/vectorstore
+  dataset_path: null              # optional
+  vector_store_dir: artifacts/vectorstore
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
   chunk_size: 512
   chunk_overlap: 50
-  workers: 2
+  workers: 1
   batch_size: 64
+  queue_size: 512                 # optional, default in dataclass
 
 inference:
-  model_path: artifacts/model/final
-  tokenizer_path: null
-  engine: python
+  model_path: artifacts/models/my_model
+  tokenizer_path: null             # optional
+  engine: transformer
   max_tokens: 256
   temperature: 0.7

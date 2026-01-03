@@ -1,5 +1,5 @@
 # Reasona/data/chunker.py
-from typing import List, Dict
+from typing import Dict, Iterable, Iterator
 from Reasona.utils.logger import setup_logger
 
 logger = setup_logger(__name__, "logs/data/chunker.json")
@@ -14,39 +14,53 @@ class TextChunker:
         self.chunk_overlap = chunk_overlap
 
         logger.info(
-            f"Initialized TextChunker(chunk_size={chunk_size}, overlap={chunk_overlap})"
+            "Initialized TextChunker(chunk_size=%d, overlap=%d)",
+            chunk_size,
+            chunk_overlap,
         )
 
-    def chunk_text(self, text: str) -> List[str]:
-        words = text.split()
-        chunks = []
+    def chunk_text(self, text: str) -> Iterator[str]:
+        if not text.strip():
+            logger.warning("Received empty text for chunking")
+            return
 
+        words = text.split()
         start = 0
+        chunk_idx = 0
+
         while start < len(words):
             end = start + self.chunk_size
-            chunk = words[start:end]
-            chunks.append(" ".join(chunk))
+            chunk_words = words[start:end]
+            yield " ".join(chunk_words)
+            chunk_idx += 1
             start = end - self.chunk_overlap
 
-        return chunks
+    def chunk_item(self, item: Dict) -> Iterator[Dict]:
+       
+        text = item.get("text", "").strip()
+        if not text:
+            logger.warning("Skipping item with empty text | metadata=%s", item.get("metadata"))
+            return
 
-    def chunk_dataset(self, dataset: List[Dict]) -> List[Dict]:
-        all_chunks = []
+        base_meta = item.get("metadata", {})
+        total_chunks = 0
 
-        for item in dataset:
-            base_text = f"{item['instruction']}\n{item['output']}"
-            chunks = self.chunk_text(base_text)
+        for i, chunk in enumerate(self.chunk_text(text)):
+            total_chunks += 1
+            yield {
+                "text": chunk,
+                "metadata": {
+                    **base_meta,
+                    "chunk_id": i,
+                },
+            }
 
-            for i, chunk in enumerate(chunks):
-                all_chunks.append(
-                    {
-                        "text": chunk,
-                        "metadata": {
-                            **item.get("metadata", {}),
-                            "chunk_id": i,
-                        },
-                    }
-                )
+        logger.info(
+            "Chunked item | original_text_length=%d words, total_chunks=%d, metadata=%s",
+            len(text.split()), total_chunks, base_meta
+        )
 
-        logger.info(f"Generated {len(all_chunks)} text chunks")
-        return all_chunks
+    def chunk_stream(self, items: Iterable[Dict]) -> Iterator[Dict]:
+      
+        for item in items:
+            yield from self.chunk_item(item)

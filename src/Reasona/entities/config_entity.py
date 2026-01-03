@@ -2,51 +2,45 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-
-# -----------------------------
-# Streaming / Preprocessing configuration
-# -----------------------------
 @dataclass(frozen=True)
 class PreprocessConfig:
     dataset_name: str
-    split: str
-    revision: str
+    split: str = "train"
+    revision: str = "main"
     max_samples: Optional[int] = None
-    cache_dir: Optional[str] = None
+    cache_dir: Optional[Path] = Path.home() / ".cache/huggingface/datasets"
+    
+    # optimize streaming 
+    buffer_size: int = 1000         
+    prefetch_buffer: int = 500               
+    block_size: str = "128MiB"               
+    num_workers: int = 2
 
 
 
-# -----------------------------
-# Training configuration
-# -----------------------------
 @dataclass(frozen=True)
 class TrainingConfig:
-    dataset_path: Path                     # path to transformed dataset
-    output_dir: Path                       # directory to save trained models
-    base_model: str                        # name of base model
+    dataset_path: Path                     
+    output_dir: Path                       
+    base_model: str                        
 
-
-# -----------------------------
-# Embedding / Indexing configuration
-# -----------------------------
 @dataclass(frozen=True)
 class IndexingConfig:
-    dataset_path: Optional[Path] = None    
-    vector_store_dir: Path = Path("artifacts/vectors")
-    embedding_model: str = "all-MiniLM-L6-v2"
-    chunk_size: int = 256
-    chunk_overlap: int = 32
-    workers: int = 2
-    batch_size: int = 64
+    dataset_path: Optional[Path]
+    vector_store_dir: Path
+    embedding_model: str
+    chunk_size: int
+    chunk_overlap: int
+    workers: int
+    batch_size: int
+    queue_size: int
 
-# -----------------------------
-# Retrieval / Inference configuration
-# -----------------------------
+
 @dataclass(frozen=True)
 class RetrievalConfig:
     vector_store_dir: Path                 # directory with FAISS / vector store
     top_k: int = 5                         # number of results to retrieve
-    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     engine: str = "vector_search"          # retrieval engine type
 
 
@@ -55,5 +49,5 @@ class InferenceConfig:
     model_path: Path                        # path to trained/generation model
     tokenizer_path: Optional[Path] = None   # optional tokenizer path
     engine: str = "transformer"             # inference engine type
-    max_tokens: int = 512
+    max_tokens: int = 256
     temperature: float = 0.7

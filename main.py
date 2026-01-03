@@ -1,33 +1,32 @@
-from pathlib import Path
 from Reasona.config.config_manager import ConfigurationManager
 from Reasona.pipeline.preprocess_pipeline import PreprocessPipeline
 from Reasona.pipeline.indexing_pipeline import IndexingPipeline
-from Reasona.data.embedder import Embedder
+from Reasona.utils.logger import setup_logger
+import multiprocessing as mp
+
+logger = setup_logger("main", "logs/pipeline/main_pipeline.json")
+
 
 def main():
     cfg = ConfigurationManager()
+
     preprocess_cfg = cfg.get_preprocess_config()
     indexing_cfg = cfg.get_indexing_config()
 
-    # streaming producer
     preprocess_pipeline = PreprocessPipeline(preprocess_cfg)
-
-    # indexing (consumer)
-    embedder = Embedder(indexing_cfg.embedding_model)
-    indexing_pipeline = IndexingPipeline(
-        embedder=embedder,
-        vector_db_dir=indexing_cfg.vector_store_dir,
-        workers=indexing_cfg.workers,
-        batch_size=indexing_cfg.batch_size,
-    )
-
+    indexing_pipeline = IndexingPipeline(indexing_cfg)
     indexing_pipeline.start()
 
-    for sample in preprocess_pipeline.stream():
-        indexing_pipeline.index_chunks(sample)
-
-    indexing_pipeline.stop()
+    total_samples = 0
+    try:
+        for sample in preprocess_pipeline.stream():
+            indexing_pipeline.index_chunks(sample)
+            total_samples += 1
+    finally:
+        indexing_pipeline.stop()
+        logger.info(f"Indexing finished. Total samples processed: {total_samples}")
 
 
 if __name__ == "__main__":
+    mp.set_start_method("spawn", force=True)
     main()

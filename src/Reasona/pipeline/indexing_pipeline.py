@@ -19,7 +19,6 @@ class IndexingPipeline:
         self.vector_db_dir = Path(cfg.vector_store_dir)
         self.vector_db_dir.mkdir(parents=True, exist_ok=True)
 
-        # Queues for raw items -> chunks -> vectors
         self.raw_queue = Queue(maxsize=cfg.queue_size)
         self.vec_queue = Queue(maxsize=cfg.queue_size)
 
@@ -27,7 +26,7 @@ class IndexingPipeline:
         self.writer_thread: Optional[Thread] = None
 
         self.log_every = cfg.log_every or 50_000
-        self.save_every = cfg.save_every or 100_000  # save FAISS every N vectors
+        self.save_every = cfg.save_every or 100_000  
 
     def start(self):
         logger.info("=== INDEXING PIPELINE STARTED ===")
@@ -85,7 +84,6 @@ class IndexingPipeline:
                     yield chunk
 
         for vectors, metas in embedder.embed_stream(stream_chunks()):
-            
             while True:
                 try:
                     self.vec_queue.put((vectors, metas), timeout=5)

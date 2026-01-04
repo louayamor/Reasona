@@ -54,20 +54,16 @@ class ConfigurationManager:
         if not cfg:
             raise ValueError("Missing 'indexing' section in config.yaml")
 
-        dataset_path_raw = cfg.get("dataset_path")
-        dataset_path = Path(dataset_path_raw) if dataset_path_raw else None
-
         return IndexingConfig(
-            dataset_path=dataset_path,
-            vector_store_dir=Path(cfg.get("vector_store_dir", "artifacts/vectors")),
-            embedding_model=cfg.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2"),
-            chunk_size=int(cfg.get("chunk_size")),
-            chunk_overlap=int(cfg.get("chunk_overlap")),
-            workers=int(cfg.get("workers")),
-            batch_size=int(cfg.get("batch_size")),
-            queue_size=int(cfg.get("queue_size")),
+            vector_store_dir=require(cfg, "vector_store_dir", "indexing"),
+            embedding_model=require(cfg, "embedding_model", "indexing"),
+            chunk_size=int(require(cfg, "chunk_size", "indexing")),
+            chunk_overlap=int(require(cfg, "chunk_overlap", "indexing")),
+            batch_size=int(require(cfg, "batch_size", "indexing")),
+            queue_size=int(require(cfg, "queue_size", "indexing")),
+            log_every=int(cfg.get("log_every", 50_000)),
+            save_every=int(cfg.get("save_every", 100_000)),
         )
-
 
     def get_inference_config(self) -> InferenceConfig:
         cfg = self.config.get("inference")

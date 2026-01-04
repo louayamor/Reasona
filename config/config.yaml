@@ -19,16 +19,14 @@ training:
 
 
 indexing:
-  dataset_path: null
-  vector_store_dir: artifacts/vectorstore
+  vector_store_dir: artifacts/vectors
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
-
-  chunk_size: 2048
-  chunk_overlap: 0
-
-  workers: 4
-  batch_size: 256
-  queue_size: 10000
+  chunk_size: 500
+  chunk_overlap: 50
+  batch_size: 64
+  queue_size: 100
+  log_every: 100000
+  save_every: 200000
 
 
 inference:

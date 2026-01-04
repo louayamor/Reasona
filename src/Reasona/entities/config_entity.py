@@ -30,16 +30,16 @@ class TrainingConfig:
     output_dir: Path                       
     base_model: str                        
 
-@dataclass(frozen=True)
+@dataclass
 class IndexingConfig:
-    dataset_path: Optional[Path]
-    vector_store_dir: Path
+    vector_store_dir: str
     embedding_model: str
     chunk_size: int
     chunk_overlap: int
-    workers: int
     batch_size: int
     queue_size: int
+    log_every: Optional[int] = 50_000      # <-- new
+    save_every: Optional[int] = 100_000 
 
 
 @dataclass(frozen=True)

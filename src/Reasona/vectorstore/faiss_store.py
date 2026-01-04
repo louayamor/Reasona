@@ -7,6 +7,10 @@ class FaissStore:
     def __init__(self, dim: int):
         self.index = faiss.IndexFlatL2(dim)
         self.metadata = []
+    
+    @property
+    def ntotal(self):
+        return self.index.ntotal
 
     def add(self, vectors, metadata):
         self.index.add(vectors)

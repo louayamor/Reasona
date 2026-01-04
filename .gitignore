@@ -1,35 +1,39 @@
+# Python caches
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+
+# Environment folders
 *.env
 *.venv
 venv/
 env/
 ENV/
-*.egg-info/
 
+# Notebook checkpoints
 .ipynb_checkpoints/
 
+# Logs
 logs/
 *.log
 
-artifacts/
-!dvc.yaml
-!dvc.lock
+# DVC internal
 .dvc/cache/
 .dvc/tmp/
 
+# Data cache
 data_cache/
 
+# IDE/editor
 .vscode/
-
 .idea/
 
+# OS files
 .DS_Store
 Thumbs.db
 
+# Temporary files
 *.tmp
 *.swp
-
-!data/*.dvc

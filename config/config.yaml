@@ -1,36 +1,39 @@
 artifacts_root: artifacts
 
 preprocess:
-  dataset_name: PleIAs/SYNTH
+  dataset_name: codelion/synth-1B
   split: train
+  language: en
   revision: main
   max_samples: null
   cache_dir: ~/.cache/huggingface/datasets
+  shuffle_buffer: 1000
+  prefetch_buffer: 512
 
-  # Streaming optimization
-  buffer_size: 10000
-  prefetch_buffer: 500          # optional, default in dataclass
-  block_size: 128MiB            # optional, default in dataclass
-  num_workers: 2                # optional, default in dataclass
+
 
 training:
   dataset_path: artifacts/dataset
   output_dir: artifacts/models
   base_model: sentence-transformers/all-MiniLM-L6-v2
 
+
 indexing:
-  dataset_path: null              # optional
+  dataset_path: null
   vector_store_dir: artifacts/vectorstore
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
-  chunk_size: 512
-  chunk_overlap: 50
-  workers: 1
-  batch_size: 64
-  queue_size: 512                 # optional, default in dataclass
+
+  chunk_size: 2048
+  chunk_overlap: 0
+
+  workers: 4
+  batch_size: 256
+  queue_size: 10000
+
 
 inference:
   model_path: artifacts/models/my_model
-  tokenizer_path: null             # optional
+  tokenizer_path: null
   engine: transformer
   max_tokens: 256
   temperature: 0.7

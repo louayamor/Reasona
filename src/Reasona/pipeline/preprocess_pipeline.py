@@ -1,80 +1,91 @@
 from typing import Iterator, Dict, Any, Optional
 import time
-import threading
-
-from Reasona.utils.logger import setup_logger
-from Reasona.data.loader import StreamingDatasetProcessor
+from Reasona.data.loader import StreamingDatasetLoader
 from Reasona.data.formatter import DataFormatter
 from Reasona.entities.config_entity import PreprocessConfig
+from Reasona.utils.logger import setup_logger
 
 logger = setup_logger(__name__, "logs/pipeline/preprocess_pipeline.json")
 
 
 class PreprocessPipeline:
     def __init__(self, cfg: PreprocessConfig):
-        logger.info("Initializing PreprocessPipeline")
         self.cfg = cfg
-
-        self.loader = StreamingDatasetProcessor(
+        self.loader = StreamingDatasetLoader(
             dataset_name=cfg.dataset_name,
-            revision=cfg.revision,
-            cache_dir=cfg.cache_dir,
+            cache_dir=str(cfg.cache_dir) if cfg.cache_dir else None,
         )
-
         self.formatter = DataFormatter()
 
-        self._samples_processed = 0
         self._start_time: Optional[float] = None
         self._first_sample_time: Optional[float] = None
-        self._lock = threading.Lock()
+        self._samples_processed: int = 0
+        self.progress_interval = getattr(cfg, "progress_interval", 50_000)
 
         if cfg.max_samples is None:
             logger.warning(
-                "max_samples=None on a large streaming dataset. "
-                "Ensure downstream stages do NOT materialize full data."
+                "max_samples=None on large streaming dataset. "
+                "Ensure downstream stages are streaming-safe."
             )
 
     def stream(self) -> Iterator[Dict[str, Any]]:
-        logger.info("=== PREPROCESS STREAM STARTED ===")
+
+        logger.info(
+            f"=== PREPROCESS PIPELINE STARTED === | dataset={self.cfg.dataset_name}, "
+            f"split={self.cfg.split}, max_samples={self.cfg.max_samples}"
+        )
 
         self._start_time = time.time()
         self._first_sample_time = None
         self._samples_processed = 0
 
-        stream = self.loader.stream_samples(
-            split=self.cfg.split,
-            max_samples=self.cfg.max_samples,
-            buffer_size=self.cfg.buffer_size,
-        )
+        for idx, raw_sample in enumerate(
+            self.loader.stream(
+                split=self.cfg.split,
+                max_samples=self.cfg.max_samples,
+                shuffle_buffer=self.cfg.shuffle_buffer,
+            ),
+            start=1,
+        ):
+            
+            if self.cfg.language:
+                sample_lang = raw_sample.get("language")
+                if sample_lang != self.cfg.language:
+                    continue
 
-        try:
-            for idx, raw_sample in enumerate(stream, start=1):
-                with self._lock:
-                    self._samples_processed += 1
-                    if self._first_sample_time is None:
-                        self._first_sample_time = time.time()
-                        logger.info(
-                            f"First sample processed | "
-                            f"startup_time={self._first_sample_time - self._start_time:.2f}s"
-                        )
+            processed = self.formatter.format_sample(raw_sample)
 
-                processed = self.formatter.format_sample(raw_sample)
-                processed["_metadata"] = {
-                    "index": idx,
-                    "timestamp": time.time(),
-                    "samples_per_second": self._throughput(),
-                }
+            if not processed.get("text"):
+                logger.warning(
+                    f"Formatted text is empty | sample keys={list(raw_sample.keys())}"
+                )
+                continue
 
-                yield processed
+            self._samples_processed += 1
 
-                if idx % 50_000 == 0:
-                    logger.info(
-                        f"Progress | samples={idx}, "
-                        f"rate={self._throughput():.1f} samples/sec"
-                    )
+            if self._first_sample_time is None:
+                self._first_sample_time = time.time()
+                logger.info(
+                    f"=== PREPROCESS STREAM STARTED === | "
+                    f"time_to_first_sample={self._first_sample_time - self._start_time:.2f}s"
+                )
 
-        finally:
-            self._log_final_stats()
+            processed["_metadata"] = {
+                "index": idx,
+                "timestamp": time.time(),
+                "samples_processed": self._samples_processed,
+                "elapsed_sec": time.time() - self._start_time,
+            }
+
+            yield processed
+
+            if idx % self.progress_interval == 0:
+                logger.info(
+                    f"Preprocessing progress | samples={idx}, "
+                    f"rate={self._throughput():.1f} samples/sec"
+                )
+
+        self._log_final_stats()
 
     def _throughput(self) -> float:
         if not self._start_time or self._samples_processed == 0:
@@ -83,10 +94,10 @@ class PreprocessPipeline:
         return self._samples_processed / elapsed if elapsed > 0 else 0.0
 
     def _log_final_stats(self):
-        elapsed = time.time() - self._start_time if self._start_time else 0
+        elapsed = time.time() - self._start_time if self._start_time else 0.0
         logger.info(
-            f"=== PREPROCESS STREAM ENDED === | "
-            f"samples={self._samples_processed}, "
-            f"time={elapsed:.2f}s, "
-            f"rate={self._throughput():.1f} samples/sec"
+            f"=== PREPROCESS PIPELINE ENDED === | "
+            f"total_samples={self._samples_processed}, "
+            f"total_time={elapsed:.2f}s, "
+            f"avg_rate={self._throughput():.1f} samples/sec"
         )

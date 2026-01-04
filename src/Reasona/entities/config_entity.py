@@ -2,19 +2,25 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-@dataclass(frozen=True)
+# Reasona/entities/config_entity.py
+
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
 class PreprocessConfig:
     dataset_name: str
-    split: str = "train"
-    revision: str = "main"
-    max_samples: Optional[int] = None
-    cache_dir: Optional[Path] = Path.home() / ".cache/huggingface/datasets"
-    
-    # optimize streaming 
-    buffer_size: int = 1000         
-    prefetch_buffer: int = 500               
-    block_size: str = "128MiB"               
-    num_workers: int = 2
+    split: str
+    revision: Optional[str]
+    cache_dir: Optional[str]
+
+    max_samples: Optional[int]
+
+    shuffle_buffer: Optional[int]
+    prefetch_buffer: Optional[int]
+
+    language: Optional[str] = "en"
+
 
 
 

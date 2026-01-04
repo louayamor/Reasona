@@ -19,6 +19,11 @@ ENV/
 logs/
 *.log
 
+# Artifacts
+artifacts/
+!artifacts/vectorstore/
+!artifacts/vectorstore/*.dvc
+
 # DVC internal
 .dvc/cache/
 .dvc/tmp/

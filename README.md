@@ -94,7 +94,6 @@ Example `preprocess` section:
 preprocess:
   dataset_name: "PleIAs/SYNTH"
   split: "train"
-  revision: "main"
   max_samples: 10000
   batch_size: 500
 ```

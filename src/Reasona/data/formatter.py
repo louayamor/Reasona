@@ -6,30 +6,31 @@ logger = setup_logger(__name__, "logs/data/formatter.json")
 
 class DataFormatter:
     def format_sample(self, sample: dict) -> dict:
-        
-        query = (sample.get("query") or "").strip()
-        reasoning = (sample.get("synthetic_reasoning") or "").strip()
-        answer = (sample.get("synthetic_answer") or "").strip()
+        text_parts = []
 
-        text_parts = [part for part in [query, reasoning, answer] if part]
-        text = " ".join(text_parts)
+        exercise = sample.get("exercise")
+        if isinstance(exercise, dict):
+            for key in ("instruction", "input", "output"):
+                val = exercise.get(key)
+                if isinstance(val, str) and val.strip():
+                    text_parts.append(val.strip())
 
-        if not text:
+        if not text_parts:
+            raw_text = sample.get("text")
+            if isinstance(raw_text, str) and raw_text.strip():
+                text_parts.append(raw_text.strip())
+
+        final_text = "\n\n".join(text_parts)
+
+        if not final_text:
             logger.warning(
                 "Formatted text is empty | sample keys=%s",
-                list(sample.keys())
+                list(sample.keys()),
             )
 
         return {
-            "text": text,
-            "query": query,
-            "reasoning": reasoning,
-            "answer": answer,
-            "metadata": {
-                "source": "PleIAs/SYNTH",
-                "lang": sample.get("language"),
-                "exercise": sample.get("exercise"),
-                "model": sample.get("model"),
-                "synth_id": sample.get("synth_id"),
-            },
+            "text": final_text,
+            "language": sample.get("language"),
+            "synth_id": sample.get("synth_id"),
         }
+

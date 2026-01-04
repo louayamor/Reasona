@@ -1,5 +1,0 @@
-stages:
-  ingest:
-    cmd: python src/Reasona/data/loader.py
-    outs:
-      - artifacts/data_ingestion

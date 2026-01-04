@@ -22,23 +22,21 @@ class ConfigurationManager:
         self.params = read_yaml(params_filepath)
 
     def get_preprocess_config(self) -> PreprocessConfig:
-        cfg = self.config.get("preprocess")
-        if not cfg:
-            raise ValueError("Missing 'preprocess' section in config.yaml")
-        
-        cache_dir = Path(cfg["cache_dir"]) if cfg.get("cache_dir") else Path.home() / ".cache/huggingface/datasets"
+        cfg = self.config["preprocess"]
 
         return PreprocessConfig(
-        dataset_name=cfg.get("dataset_name", "PleIAs/SYNTH"),
-        split=cfg.get("split", "train"),
-        max_samples=cfg.get("max_samples"),
-        revision=cfg.get("revision", "main"),
-        cache_dir=cache_dir,
-        buffer_size=int(cfg.get("buffer_size", 1000)),
-        prefetch_buffer=int(cfg.get("prefetch_buffer", 500)),
-        block_size=cfg.get("block_size", "128MiB"),
-        num_workers=int(cfg.get("num_workers", 2)),
-    )
+            dataset_name=cfg["dataset_name"],
+            split=cfg.get("split", "train"),
+            shuffle_buffer=int(cfg.get("shuffle_buffer")),
+            max_samples=cfg.get("max_samples"),
+            revision=cfg.get("revision"),
+            prefetch_buffer=cfg.get("prefetch_buffer"),
+            language=cfg.get("language", "en"),
+            cache_dir=Path(cfg["cache_dir"]).expanduser()
+            if cfg.get("cache_dir")
+            else None,
+        )
+
 
     def get_training_config(self) -> TrainingConfig:
         cfg = self.config.get("training")
@@ -63,11 +61,11 @@ class ConfigurationManager:
             dataset_path=dataset_path,
             vector_store_dir=Path(cfg.get("vector_store_dir", "artifacts/vectors")),
             embedding_model=cfg.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2"),
-            chunk_size=int(cfg.get("chunk_size", 256)),
-            chunk_overlap=int(cfg.get("chunk_overlap", 32)),
-            workers=int(cfg.get("workers", 2)),
-            batch_size=int(cfg.get("batch_size", 64)),
-            queue_size=int(cfg.get("queue_size", 512)),
+            chunk_size=int(cfg.get("chunk_size")),
+            chunk_overlap=int(cfg.get("chunk_overlap")),
+            workers=int(cfg.get("workers")),
+            batch_size=int(cfg.get("batch_size")),
+            queue_size=int(cfg.get("queue_size")),
         )
 
 

@@ -5,7 +5,7 @@ logger = setup_logger(__name__, "logs/data/formatter.json")
 
 
 class DataFormatter:
-    def format_sample(self, sample: dict) -> dict:
+    def format_sample(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         text_parts = []
 
         exercise = sample.get("exercise")
@@ -32,5 +32,5 @@ class DataFormatter:
             "text": final_text,
             "language": sample.get("language"),
             "synth_id": sample.get("synth_id"),
+            "_metadata": sample,  
         }
-

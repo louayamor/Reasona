@@ -27,6 +27,7 @@ indexing:
   queue_size: 100
   log_every: 100000
   save_every: 200000
+  keep_versions: 5
 
 
 inference:

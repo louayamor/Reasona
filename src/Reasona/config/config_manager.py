@@ -63,6 +63,7 @@ class ConfigurationManager:
             queue_size=int(require(cfg, "queue_size", "indexing")),
             log_every=int(cfg.get("log_every", 50_000)),
             save_every=int(cfg.get("save_every", 100_000)),
+            keep_versions=int(cfg.get("keep_versions", 5)),
         )
 
     def get_inference_config(self) -> InferenceConfig:

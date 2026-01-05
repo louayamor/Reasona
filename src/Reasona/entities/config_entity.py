@@ -38,8 +38,9 @@ class IndexingConfig:
     chunk_overlap: int
     batch_size: int
     queue_size: int
-    log_every: Optional[int] = 50_000      # <-- new
+    log_every: Optional[int] = 50_000     
     save_every: Optional[int] = 100_000 
+    keep_versions: int = 5
 
 
 @dataclass(frozen=True)

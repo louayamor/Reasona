@@ -34,3 +34,4 @@ jobs:
 
       - name: Push DVC artifacts to DagsHub
         run: dvc push
+        

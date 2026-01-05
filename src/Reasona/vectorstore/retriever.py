@@ -16,21 +16,34 @@ class Retriever:
         return_scores: bool = True,
         filter_fn: Optional[Callable[[Dict], bool]] = None,
     ) -> List[Dict]:
-        
+
         q_vec = self.embedder.embed([query]).astype("float32")
+
         distances, indices = self.store.index.search(q_vec, k)
 
-        results = []
+        results: List[Dict] = []
+
         for rank, idx in enumerate(indices[0]):
-            item = {
-                "text": self.store.texts[idx],
-                "metadata": self.store.metadata[idx],
-            }
-            if filter_fn and not filter_fn(item):
+            if idx < 0:
                 continue
+
+            meta = self.store.metadata[idx]
+
+            text = str(meta.get("text") or meta.get("content") or "")
+
+            item = {
+                "text": text,
+                "metadata": meta,
+            }
+
+            if filter_fn and not filter_fn(meta):
+                continue
+
             if return_scores:
-                item["score"] = float(distances[0][rank])
+                item["score"] = float(1.0 / (1.0 + distances[0][rank]))
+
             results.append(item)
+
         return results
 
     def retrieve_batch(
@@ -40,7 +53,8 @@ class Retriever:
         return_scores: bool = True,
         filter_fn: Optional[Callable[[Dict], bool]] = None,
     ) -> List[List[Dict]]:
-        batch_results = []
-        for q in queries:
-            batch_results.append(self.retrieve(q, k=k, return_scores=return_scores, filter_fn=filter_fn))
-        return batch_results
+
+        return [
+            self.retrieve(q, k=k, return_scores=return_scores, filter_fn=filter_fn)
+            for q in queries
+        ]

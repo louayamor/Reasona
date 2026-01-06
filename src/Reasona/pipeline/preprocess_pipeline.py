@@ -3,19 +3,22 @@ import time
 from Reasona.data.loader import StreamingDatasetLoader
 from Reasona.data.formatter import DataFormatter
 from Reasona.entities.config_entity import PreprocessConfig
+from Reasona.data.validator import Validator
 from Reasona.utils.logger import setup_logger
 
 logger = setup_logger(__name__, "logs/pipeline/preprocess_pipeline.json")
 
 
 class PreprocessPipeline:
-    def __init__(self, cfg: PreprocessConfig):
+    def __init__(self, cfg: PreprocessConfig, schema_path: str):
         self.cfg = cfg
         self.loader = StreamingDatasetLoader(
             dataset_name=cfg.dataset_name,
             cache_dir=str(cfg.cache_dir) if cfg.cache_dir else None,
         )
         self.formatter = DataFormatter()
+
+        self.validator = Validator(schema_path=schema_path)
 
         self._start_time: Optional[float] = None
         self._first_sample_time: Optional[float] = None
@@ -29,7 +32,6 @@ class PreprocessPipeline:
             )
 
     def stream(self) -> Iterator[Dict[str, Any]]:
-
         logger.info(
             f"=== PREPROCESS PIPELINE STARTED === | dataset={self.cfg.dataset_name}, "
             f"split={self.cfg.split}, max_samples={self.cfg.max_samples}"
@@ -47,20 +49,13 @@ class PreprocessPipeline:
             ),
             start=1,
         ):
-            
-            if self.cfg.language:
-                sample_lang = raw_sample.get("language")
-                if sample_lang != self.cfg.language:
-                    continue
-
-            processed = self.formatter.format_sample(raw_sample)
-
-            if not processed.get("text"):
-                logger.warning(
-                    f"Formatted text is empty | sample keys={list(raw_sample.keys())}"
-                )
+            if self.cfg.language and raw_sample.get("language") != self.cfg.language:
                 continue
 
+            if not self.validator.validate(raw_sample):
+                continue
+
+            processed = self.formatter.format_sample(raw_sample)
             self._samples_processed += 1
 
             if self._first_sample_time is None:

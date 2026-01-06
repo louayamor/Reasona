@@ -12,6 +12,12 @@ venv/
 env/
 ENV/
 
+artifacts/
+
+research/
+
+cli.py
+
 # Notebook checkpoints
 .ipynb_checkpoints/
 

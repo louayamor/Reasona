@@ -1,5 +1,0 @@
-outs:
-- md5: 021ac49fb58b4c4ee989a7cfd228b039
-  size: 1015957939
-  hash: md5
-  path: faiss_index_20260105_123151.pkl

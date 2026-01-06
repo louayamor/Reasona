@@ -1,4 +1,3 @@
-# Reasona/pipeline/indexing_pipeline.py
 import time
 import pickle
 from pathlib import Path
@@ -8,9 +7,9 @@ from typing import Optional
 from Reasona.data.embedder import Embedder
 from Reasona.data.chunker import TextChunker
 from Reasona.vectorstore.faiss_store import FaissStore
-from Reasona.vectorstore.faiss_store_manager import FaissStoreManager
 from Reasona.config.config_manager import IndexingConfig
 from Reasona.utils.logger import setup_logger
+import glob
 
 logger = setup_logger(__name__, "logs/pipeline/indexing_pipeline.json")
 
@@ -18,11 +17,8 @@ logger = setup_logger(__name__, "logs/pipeline/indexing_pipeline.json")
 class IndexingPipeline:
     def __init__(self, cfg: IndexingConfig):
         self.cfg = cfg
-
         self.vector_db_dir = Path(cfg.vector_store_dir)
         self.vector_db_dir.mkdir(parents=True, exist_ok=True)
-
-        self.store_manager = FaissStoreManager(str(self.vector_db_dir), keep_versions=cfg.keep_versions)
 
         self.raw_queue = Queue(maxsize=cfg.queue_size)
         self.vec_queue = Queue(maxsize=cfg.queue_size)
@@ -32,6 +28,8 @@ class IndexingPipeline:
 
         self.log_every = cfg.log_every or 50_000
         self.save_every = cfg.save_every or 100_000  
+
+        self.store: Optional[FaissStore] = None
 
     def start(self):
         logger.info("=== INDEXING PIPELINE STARTED ===")
@@ -83,11 +81,12 @@ class IndexingPipeline:
                     chunks_emitted += 1
                     chunk_text = chunk["text"]
                     chunk_meta = {
+                        "text": chunk_text,
                         "source": item.get("source") if isinstance(item, dict) else None,
                         "original_text_length": len(item["text"].split()) if isinstance(item, dict) else len(item.split()),
-                        "_metadata": item  
+                        "_metadata": item
                     }
-                    yield {"text": chunk_text, "metadata": chunk_meta}
+                    yield chunk_meta
 
         for vectors, metas in embedder.embed_stream(stream_chunks()):
             while True:
@@ -116,10 +115,22 @@ class IndexingPipeline:
     def _writer_worker(self):
         logger.info("FAISS writer started")
 
-        store: Optional[FaissStore] = None
         vectors_written = 0
         all_metadata = []  
         start_time = time.time()
+
+        index_files = sorted(glob.glob(str(self.vector_db_dir / "*.index")))
+        if index_files:
+            latest_index_path = index_files[-1]
+            self.store = FaissStore(dim=384)  
+            self.store.load(latest_index_path)
+            meta_path = Path(latest_index_path).with_suffix(".pkl")
+            if meta_path.exists():
+                with open(meta_path, "rb") as f:
+                    all_metadata = pickle.load(f)
+            logger.info("Loaded FAISS index from %s with %d vectors", latest_index_path, len(all_metadata))
+        else:
+            self.store = None
 
         while True:
             try:
@@ -131,22 +142,12 @@ class IndexingPipeline:
 
             vectors, metas = item
 
-            if store is None:
+            if self.store is None:
                 dim = vectors.shape[1]
+                self.store = FaissStore(dim=dim)
+                logger.info("FAISS initialized | dim=%d", dim)
 
-                latest_index = self.store_manager.load_latest_index()
-                if latest_index is not None:
-                    store = FaissStore(dim=dim)
-                    store.index = latest_index
-                    store.metadata = []  
-                    logger.info(
-                        "Resuming FAISS store from latest index | dim=%d", dim
-                    )
-                else:
-                    store = FaissStore(dim=dim)
-                    logger.info("FAISS initialized | dim=%d", dim)
-
-            store.add(vectors, metas)
+            self.store.add(vectors, metas)
             all_metadata.extend(metas)
             vectors_written += vectors.shape[0]
 
@@ -154,28 +155,24 @@ class IndexingPipeline:
                 rate = vectors_written / max(time.time() - start_time, 1e-6)
                 logger.info(
                     "Indexing progress | vectors=%d total=%d | rate=%.1f vec/s",
-                    vectors_written, len(store.metadata), rate
+                    vectors_written, len(self.store.metadata), rate
                 )
 
             if vectors_written % self.save_every < vectors.shape[0]:
-                path = self.store_manager.save_index(store.index)
-                
-                meta_path = Path(str(path)).with_suffix(".pkl")
+                index_path = self.vector_db_dir / f"index_{int(time.time())}.index"
+                self.store.save(index_path)
+                meta_path = index_path.with_suffix(".pkl")
                 with open(meta_path, "wb") as f:
                     pickle.dump(all_metadata, f)
-                logger.info(
-                    "Incremental save | path=%s | total_vectors=%d | metadata saved",
-                    path, len(store.metadata)
-                )
+                logger.info("Incremental save | path=%s | total_vectors=%d", index_path, len(all_metadata))
 
-        if store is not None:
-            path = self.store_manager.save_index(store.index)
-            meta_path = Path(str(path)).with_suffix(".pkl")
+        if self.store is not None:
+            index_path = self.vector_db_dir / f"index_{int(time.time())}.index"
+            self.store.save(index_path)
+            meta_path = index_path.with_suffix(".pkl")
             with open(meta_path, "wb") as f:
                 pickle.dump(all_metadata, f)
-            logger.info(
-                "Vector store saved | path=%s total_vectors=%d | metadata saved | runtime=%.1fs",
-                path, len(store.metadata), time.time() - start_time
-            )
+            logger.info("Vector store saved | path=%s total_vectors=%d | runtime=%.1fs",
+                        index_path, len(all_metadata), time.time() - start_time)
 
         logger.info("FAISS writer finished")

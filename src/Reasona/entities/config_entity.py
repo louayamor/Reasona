@@ -41,9 +41,9 @@ class IndexingConfig:
 @dataclass(frozen=True)
 class RetrievalConfig:
     vector_store_dir: Path                
-    top_k: int = 5                         
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    engine: str = "vector_search"         
+    top_k: int                        
+    embedding_model: str 
+    engine: str         
 
 
 @dataclass(frozen=True)

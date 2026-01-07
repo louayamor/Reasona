@@ -1,15 +1,14 @@
 import time
-import pickle
 from pathlib import Path
 from queue import Queue, Full, Empty
 from threading import Thread
 from typing import Optional
+
 from Reasona.data.embedder import Embedder
 from Reasona.data.chunker import TextChunker
 from Reasona.vectorstore.faiss_store import FaissStore
 from Reasona.config.config_manager import IndexingConfig
 from Reasona.utils.logger import setup_logger
-import glob
 
 logger = setup_logger(__name__, "logs/pipeline/indexing_pipeline.json")
 
@@ -30,6 +29,10 @@ class IndexingPipeline:
         self.save_every = cfg.save_every 
 
         self.store: Optional[FaissStore] = None
+
+        # Paths for saving/loading
+        self.index_path = self.vector_db_dir / "index.faiss"
+        self.meta_path = self.vector_db_dir / "meta.pkl"
 
     def start(self):
         logger.info("=== INDEXING PIPELINE STARTED ===")
@@ -54,6 +57,9 @@ class IndexingPipeline:
         self.writer_thread.join()
         logger.info("=== INDEXING PIPELINE FINISHED ===")
 
+    # -----------------------------
+    # Embedder worker
+    # -----------------------------
     def _embedder_worker(self):
         logger.info("Embedder thread started")
 
@@ -112,6 +118,9 @@ class IndexingPipeline:
                     items_seen, chunks_emitted, vectors_emitted, rate
                 )
 
+    # -----------------------------
+    # Writer worker
+    # -----------------------------
     def _writer_worker(self):
         logger.info("FAISS writer started")
 
@@ -119,7 +128,6 @@ class IndexingPipeline:
         start_time = time.time()
 
         self.store = None
-        save_path = self.vector_db_dir  
 
         while True:
             try:
@@ -148,18 +156,17 @@ class IndexingPipeline:
                 )
 
             if vectors_written % self.save_every < vectors.shape[0]:
-                self.store.save(save_path)
+                self.store.save(self.index_path, self.meta_path)
                 logger.info(
                     "Checkpoint saved | vectors=%d | path=%s",
-                    vectors_written, save_path
+                    vectors_written, self.vector_db_dir
                 )
 
         if self.store is not None:
-            self.store.save(save_path)
+            self.store.save(self.index_path, self.meta_path)
             logger.info(
                 "Final FAISS index saved | vectors=%d | runtime=%.1fs",
                 vectors_written, time.time() - start_time
             )
 
         logger.info("FAISS writer finished")
-

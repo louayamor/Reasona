@@ -15,28 +15,24 @@ class FaissStore:
         self.index.add(vectors)
         self.metadata.extend(metadata)
 
-    def save(self, path: Path):
+    def save(self, index_path: Path, meta_path: Path):
         
-        path.mkdir(parents=True, exist_ok=True)
-
-        faiss.write_index(self.index, str(path / "index.faiss"))
-        with open(path / "meta.pkl", "wb") as f:
+        faiss.write_index(self.index, str(index_path))
+        with open(meta_path, "wb") as f:
             pickle.dump(self.metadata, f)
 
     @classmethod
-    def load(cls, path: Path) -> "FaissStore":
-        index_file = path / "index.faiss"
-        meta_file = path / "meta.pkl"
+    def load(cls, index_path: Path, meta_path: Path) -> "FaissStore":
 
-        if not index_file.exists():
-            raise FileNotFoundError("index.faiss not found")
+        if not index_path.exists():
+            raise FileNotFoundError(f"{index_path} not found")
 
-        index = faiss.read_index(str(index_file))
+        index = faiss.read_index(str(index_path))
         store = cls(index.d)
         store.index = index
 
-        if meta_file.exists():
-            with open(meta_file, "rb") as f:
+        if meta_path.exists():
+            with open(meta_path, "rb") as f:
                 store.metadata = pickle.load(f)
         else:
             store.metadata = []

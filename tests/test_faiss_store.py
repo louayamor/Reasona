@@ -1,27 +1,27 @@
 from pathlib import Path
-import numpy as np
+import pickle
+import faiss
 from Reasona.vectorstore.faiss_store import FaissStore
-from Reasona.vectorstore.faiss_store_manager import FaissStoreManager
 
 def main():
     store_dir = Path("artifacts/vectors")
-    manager = FaissStoreManager(store_dir)
+    index_file = store_dir / "index.faiss"
 
-    index = manager.load_latest_index()
-    if index is None:
-        print("No FAISS index found yet!")
+    if not index_file.exists():
+        print("FAISS index file not found!")
         return
 
+    index = faiss.read_index(str(index_file))
     store = FaissStore(dim=index.d)
     store.index = index
 
     meta_path = store_dir / "meta.pkl"
     if meta_path.exists():
-        import pickle
         with open(meta_path, "rb") as f:
             store.metadata = pickle.load(f)
     else:
         print("Metadata file not found, only vectors loaded.")
+        store.metadata = []
 
     print(f"Loaded FAISS index with {store.ntotal} vectors")
     print("-" * 50)

@@ -17,6 +17,7 @@ class PreprocessPipeline:
 
         self.loader = StreamingDatasetLoader(
             dataset_name=cfg.dataset_name,
+            dataset_config=cfg.dataset_config,
             cache_dir=str(cfg.cache_dir) if cfg.cache_dir else None,
         )
 

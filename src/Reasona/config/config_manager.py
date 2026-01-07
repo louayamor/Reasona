@@ -33,10 +33,10 @@ class ConfigurationManager:
 
         return PreprocessConfig(
             dataset_name=cfg["dataset_name"],
-            dataset_config=cfg.get("dataset_config"),
+            dataset_config=cfg["dataset_config"],
             split=cfg.get("split", "train"),
-            shuffle_buffer=_to_int(cfg.get("shuffle_buffer"), default=0),
-            max_samples=_to_int(cfg.get("max_samples")),
+            shuffle_buffer=cfg["shuffle_buffer"],
+            max_samples=cfg["max_samples"],
             cache_dir=Path(cfg["cache_dir"]).expanduser() if cfg.get("cache_dir") else None,
             schema_path=Path(cfg["schema_path"]) if cfg.get("schema_path") else None,
         )
@@ -55,7 +55,6 @@ class ConfigurationManager:
             queue_size=int(require(cfg, "queue_size", "indexing")),
             log_every=int(cfg.get("log_every")),
             save_every=int(cfg.get("save_every")),
-            keep_versions=int(cfg.get("keep_versions")),
         )
         
 

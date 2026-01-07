@@ -2,23 +2,24 @@ artifacts_root: artifacts
 
 preprocess:
   dataset_name: wikimedia/wikipedia
-  dataset_config: 20231101.en
+  dataset_config: 20231101.en  
   split: train
-  max_samples: 100000
-  shuffle_buffer: 1000
+  max_samples: 4000000
   cache_dir: ~/.cache/huggingface/datasets
+  shuffle_buffer: 2000
+  prefetch_buffer: 1024
   schema_path: config/schema.yaml
+
 
 indexing:
   vector_store_dir: artifacts/vectors
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
-  chunk_size: 600
-  chunk_overlap: 0
-  batch_size: 32
-  queue_size: 500
-  log_every: 20000
-  save_every: 20000
-  keep_versions: 1
+  chunk_size: 700 # using bigger chunk to reduce overhead, fits my gpu memory
+  chunk_overlap: 50 # overlapping chunks to improve retrieval accuracy
+  batch_size: 32 # depending on my gpu usage (rtx 2050 )
+  queue_size: 1200
+  log_every: 500000
+  save_every: 500000
 
 training:
   dataset_path: artifacts/dataset

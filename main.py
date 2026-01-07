@@ -2,7 +2,6 @@ from Reasona.config.config_manager import ConfigurationManager
 from Reasona.pipeline.preprocess_pipeline import PreprocessPipeline
 from Reasona.pipeline.indexing_pipeline import IndexingPipeline
 from Reasona.utils.logger import setup_logger
-import multiprocessing as mp
 
 logger = setup_logger("main", "logs/pipeline/main_pipeline.json")
 
@@ -28,5 +27,4 @@ def main():
 
 
 if __name__ == "__main__":
-    mp.set_start_method("spawn", force=True)
     main()

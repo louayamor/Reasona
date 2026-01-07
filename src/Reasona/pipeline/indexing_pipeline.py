@@ -1,8 +1,8 @@
 import time
 from pathlib import Path
-from multiprocessing import Process, Queue
-from queue import Empty, Full
-from typing import Dict, Any
+from queue import Queue, Empty, Full
+from threading import Thread
+from typing import Dict, Any, Optional
 
 from Reasona.data.embedder import Embedder
 from Reasona.data.chunker import TextChunker
@@ -20,30 +20,29 @@ class IndexingPipeline:
         self.raw_queue: Queue = Queue(maxsize=cfg.queue_size)
         self.vec_queue: Queue = Queue(maxsize=cfg.queue_size * 3)
 
-        self.embedder_process: Process | None = None
-        self.writer_process: Process | None = None
+        self.embedder_thread: Optional[Thread] = None
+        self.writer_thread: Optional[Thread] = None
 
         self.index_path = self.vector_db_dir / "index.faiss"
         self.meta_path = self.vector_db_dir / "meta.pkl"
 
     def start(self):
-        """Start embedding and writer processes"""
-        self.embedder_process = Process(
-            target=self._embedder_worker,
+        """Start embedder and writer threads"""
+        self.embedder_thread = Thread(
+            target=self._embedder_worker, 
             args=(self.raw_queue, self.vec_queue, self.cfg),
-            name="embedder-process"
+            name="embedder-thread"
         )
-        self.writer_process = Process(
-            target=self._writer_worker,
+        self.writer_thread = Thread(
+            target=self._writer_worker, 
             args=(self.vec_queue, self.index_path, self.meta_path, self.cfg),
-            name="faiss-writer-process"
+            name="faiss-writer-thread"
         )
 
-        self.embedder_process.start()
-        self.writer_process.start()
+        self.embedder_thread.start()
+        self.writer_thread.start()
 
     def index_chunks(self, item: Dict[str, Any] | str):
-        
         while True:
             try:
                 self.raw_queue.put(item, timeout=5)
@@ -52,21 +51,20 @@ class IndexingPipeline:
                 print("Raw queue full, waiting to enqueue item...")
 
     def stop(self):
-
         self.raw_queue.put(None)
-        self.embedder_process.join()
+        self.embedder_thread.join()
 
         self.vec_queue.put(None)
-        self.writer_process.join()
+        self.writer_thread.join()
         print("=== INDEXING PIPELINE FINISHED ===")
 
     # -----------------------------
-    # Embedder process target
+    # Embedder thread target
     # -----------------------------
     @staticmethod
     def _embedder_worker(raw_queue: Queue, vec_queue: Queue, cfg: IndexingConfig):
         logger = setup_logger("embedder", "logs/pipeline/embedder.json")
-        logger.info("Embedder process started")
+        logger.info("Embedder thread started")
 
         embedder = Embedder(cfg.embedding_model, batch_size=cfg.batch_size)
         chunker = TextChunker(cfg.chunk_size, cfg.chunk_overlap)
@@ -123,15 +121,15 @@ class IndexingPipeline:
                     items_seen, chunks_emitted, vectors_emitted, rate
                 )
 
-        logger.info("Embedder process finished")
+        logger.info("Embedder thread finished")
 
     # -----------------------------
-    # Writer process target
+    # Writer thread target
     # -----------------------------
     @staticmethod
     def _writer_worker(vec_queue: Queue, index_path: Path, meta_path: Path, cfg: IndexingConfig):
         logger = setup_logger("writer", "logs/pipeline/faiss_writer.json")
-        logger.info("FAISS writer process started")
+        logger.info("FAISS writer thread started")
 
         store: FaissStore | None = None
         vectors_written = 0
@@ -176,4 +174,4 @@ class IndexingPipeline:
                 vectors_written, time.time() - start_time
             )
 
-        logger.info("FAISS writer process finished")
+        logger.info("FAISS writer thread finished")

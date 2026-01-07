@@ -14,7 +14,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class PreprocessConfig:
     dataset_name: str                    
-    dataset_config: Optional[str] = None 
+    dataset_config: str 
     split: str = "train"                
     cache_dir: Optional[Path] = None     
     shuffle_buffer: int = 0              
@@ -37,7 +37,6 @@ class IndexingConfig:
     queue_size: int
     log_every: Optional[int]    
     save_every: Optional[int]
-    keep_versions: int = 5
 
 
 @dataclass(frozen=True)

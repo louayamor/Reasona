@@ -9,8 +9,8 @@ class StreamingDatasetLoader:
     def __init__(
         self,
         dataset_name: str,
-        dataset_config: Optional[str] = None,
-        cache_dir: Optional[str] = None,
+        dataset_config: str,
+        cache_dir: Optional[str],
     ):
         self.dataset_name = dataset_name
         self.dataset_config = dataset_config
@@ -19,7 +19,7 @@ class StreamingDatasetLoader:
     def stream(
         self,
         split: str,
-        shuffle_buffer: int = 0,
+        shuffle_buffer: int,
         max_samples: Optional[int] = None,
     ) -> Iterator[Dict[str, Any]]:
 
@@ -32,11 +32,12 @@ class StreamingDatasetLoader:
 
         ds = load_dataset(
             self.dataset_name,
-            self.dataset_config,
+            name=self.dataset_config  ,
             split=split,
             streaming=True,
             cache_dir=self.cache_dir,
         )
+
 
         if shuffle_buffer and shuffle_buffer > 0:
             logger.info("Shuffling stream | buffer_size=%d", shuffle_buffer)

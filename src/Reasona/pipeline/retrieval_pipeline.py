@@ -11,34 +11,29 @@ logger = setup_logger("retrieval_pipeline", "logs/pipeline/retrieval_pipeline.js
 
 
 class RetrievalPipeline:
-    """
-    End-to-end retrieval pipeline for querying indexed vectors.
-    """
-
     def __init__(self, cfg: RetrievalConfig):
         self.cfg = cfg
         self.vector_store_dir: Path = cfg.vector_store_dir
 
-        # Load FAISS vector store
-        self.store = FaissStore.load_from_dir(self.vector_store_dir)
-        logger.info(f"Loaded FAISS vector store from {self.vector_store_dir} (dim={self.store.dim})")
+        index_path = self.vector_store_dir / "index.faiss"
+        meta_path = self.vector_store_dir / "meta.pkl"
 
-        # Embedder
+        self.store = FaissStore.load(index_path, meta_path)
+        logger.info(
+            f"Loaded FAISS vector store from {index_path} "
+            f"with {len(self.store.metadata)} vectors"
+        )
+
         self.embedder = Embedder(cfg.embedding_model)
-
-        # Retriever
         self.retriever = Retriever(self.store, self.embedder)
-
-    # ---------------- Public API ----------------
 
     def query(
         self,
         query_text: str,
         top_k: Optional[int] = None,
         return_scores: bool = True,
-        filter_fn: Optional[Callable[[Dict], bool]] = None
+        filter_fn: Optional[Callable[[Dict], bool]] = None,
     ) -> List[Dict]:
-        """Single-query retrieval."""
         top_k = top_k or self.cfg.top_k
         logger.info(f"Running retrieval for query: {query_text[:50]}...")
         results = self.retriever.retrieve(
@@ -52,7 +47,7 @@ class RetrievalPipeline:
         queries: Iterable[str],
         top_k: Optional[int] = None,
         return_scores: bool = True,
-        filter_fn: Optional[Callable[[Dict], bool]] = None
+        filter_fn: Optional[Callable[[Dict], bool]] = None,
     ) -> List[List[Dict]]:
         queries = list(queries)
         top_k = top_k or self.cfg.top_k

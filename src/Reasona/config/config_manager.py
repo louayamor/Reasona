@@ -5,6 +5,7 @@ from Reasona.entities.config_entity import (
     TrainingConfig,
     IndexingConfig,
     InferenceConfig,
+    RetrievalConfig
 )
 from Reasona.config.validators import require
 
@@ -53,6 +54,18 @@ class ConfigurationManager:
             keep_versions=int(cfg.get("keep_versions")),
         )
         
+
+    def get_retrieval_config(self) -> RetrievalConfig:
+        cfg = self.config.get("retrieval")
+        if not cfg:
+            raise ValueError("Missing 'retrieval' section in config.yaml")
+
+        return RetrievalConfig(
+            vector_store_dir=Path(require(cfg, "vector_store_dir", "retrieval")),
+            top_k=int(require(cfg, "top_k", "retrieval")),
+            embedding_model=require(cfg, "embedding_model", "retrieval"),
+            engine=require(cfg, "engine", "retrieval"),
+        )
 
     def get_training_config(self) -> TrainingConfig:
         cfg = self.config.get("training")

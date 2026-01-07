@@ -39,7 +39,7 @@ retrieval:
   vector_store_dir: artifacts/vectors
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
   top_k: 5
-  engine: vector_search 
+  engine: vector_search
 
 
 inference:

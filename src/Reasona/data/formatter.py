@@ -7,13 +7,12 @@ logger = setup_logger(__name__, "logs/data/formatter.json")
 
 
 class DataFormatter:
-    def __init__(self, schema_path: str = "dataset_schema.yaml", language: Optional[str] = None):
-
+    def __init__(self, schema_path: str = "config/schema.yaml"):
         self.schema_path = Path(schema_path)
         if not self.schema_path.exists():
             raise FileNotFoundError(f"Dataset schema not found: {self.schema_path}")
 
-        with open(self.schema_path, "r") as f:
+        with open(self.schema_path, "r", encoding="utf-8") as f:
             schema = yaml.safe_load(f)
 
         self.content_fields = [
@@ -23,14 +22,7 @@ class DataFormatter:
             k for k, v in schema.get("columns", {}).items() if v.get("role") == "metadata"
         ]
 
-        self.language = language
-
     def format_sample(self, sample: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        
-        if self.language:
-            sample_lang = sample.get("language")
-            if sample_lang != self.language:
-                return None
 
         text_parts = []
         for field in self.content_fields:
@@ -43,10 +35,7 @@ class DataFormatter:
         final_text = "\n\n".join(text_parts)
 
         if not final_text:
-            logger.warning(
-                "Formatted text is empty | sample keys=%s",
-                list(sample.keys()),
-            )
+            logger.warning("Formatted text is empty | sample keys=%s", list(sample.keys()))
             return None
 
         metadata = {field: sample.get(field) for field in self.metadata_fields}
@@ -54,5 +43,5 @@ class DataFormatter:
         return {
             "text": final_text,
             **metadata,
-            "_metadata": sample,  
+            "_metadata": sample, 
         }

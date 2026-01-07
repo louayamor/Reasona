@@ -20,10 +20,9 @@ class PreprocessPipeline:
             cache_dir=str(cfg.cache_dir) if cfg.cache_dir else None,
         )
 
-        schema_path = str(cfg.schema_path) if cfg.schema_path else "config/dataset_schema.yaml"
+        schema_path = str(cfg.schema_path) if cfg.schema_path else "config/schema.yaml"
 
         self.validator = Validator(schema_path=schema_path)
-
         self.formatter = DataFormatter(schema_path=schema_path)
 
     def stream(self) -> Iterator[Dict[str, Any]]:
@@ -40,19 +39,17 @@ class PreprocessPipeline:
             max_samples=self.cfg.max_samples,
             shuffle_buffer=self.cfg.shuffle_buffer,
         ):
-            
+
             if not self.validator.is_valid(raw_sample):
                 logger.warning("Invalid sample skipped | keys=%s", list(raw_sample.keys()))
                 continue
 
-            if self.cfg.language and raw_sample.get("language") != self.cfg.language:
-                continue
-
             processed = self.formatter.format_sample(raw_sample)
-            if not processed.get("text"):
+            if not processed:
                 continue
 
             samples_processed += 1
+
             if first_sample_time is None:
                 first_sample_time = time.time()
                 logger.info(

@@ -1,8 +1,8 @@
 import time
 from pathlib import Path
-from queue import Empty, Full
 from multiprocessing import Process, Queue
-from typing import Optional
+from queue import Empty, Full
+from typing import Dict, Any
 
 from Reasona.data.embedder import Embedder
 from Reasona.data.chunker import TextChunker
@@ -10,10 +10,8 @@ from Reasona.vectorstore.faiss_store import FaissStore
 from Reasona.config.config_manager import IndexingConfig
 from Reasona.utils.logger import setup_logger
 
-logger = setup_logger(__name__, "logs/pipeline/indexing_pipeline.json")
 
-
-class IndexingPipelineMP:
+class IndexingPipeline:
     def __init__(self, cfg: IndexingConfig):
         self.cfg = cfg
         self.vector_db_dir = Path(cfg.vector_store_dir)
@@ -22,30 +20,36 @@ class IndexingPipelineMP:
         self.raw_queue: Queue = Queue(maxsize=cfg.queue_size)
         self.vec_queue: Queue = Queue(maxsize=cfg.queue_size * 3)
 
-        self.embedder_process: Optional[Process] = None
-        self.writer_process: Optional[Process] = None
-
-        self.log_every = cfg.log_every
-        self.save_every = cfg.save_every
+        self.embedder_process: Process | None = None
+        self.writer_process: Process | None = None
 
         self.index_path = self.vector_db_dir / "index.faiss"
         self.meta_path = self.vector_db_dir / "meta.pkl"
 
     def start(self):
-        logger.info("=== INDEXING PIPELINE STARTED ===")
-        self.embedder_process = Process(target=self._embedder_worker, name="embedder-process")
-        self.writer_process = Process(target=self._writer_worker, name="faiss-writer-process")
+        """Start embedding and writer processes"""
+        self.embedder_process = Process(
+            target=self._embedder_worker,
+            args=(self.raw_queue, self.vec_queue, self.cfg),
+            name="embedder-process"
+        )
+        self.writer_process = Process(
+            target=self._writer_worker,
+            args=(self.vec_queue, self.index_path, self.meta_path, self.cfg),
+            name="faiss-writer-process"
+        )
 
         self.embedder_process.start()
         self.writer_process.start()
 
-    def index_chunks(self, item):
+    def index_chunks(self, item: Dict[str, Any] | str):
+        
         while True:
             try:
                 self.raw_queue.put(item, timeout=5)
                 break
             except Full:
-                logger.warning("Raw queue full, waiting to enqueue item")
+                print("Raw queue full, waiting to enqueue item...")
 
     def stop(self):
 
@@ -54,14 +58,18 @@ class IndexingPipelineMP:
 
         self.vec_queue.put(None)
         self.writer_process.join()
-        logger.info("=== INDEXING PIPELINE FINISHED ===")
+        print("=== INDEXING PIPELINE FINISHED ===")
 
-    # Embedder worker process
-
-    def _embedder_worker(self):
+    # -----------------------------
+    # Embedder process target
+    # -----------------------------
+    @staticmethod
+    def _embedder_worker(raw_queue: Queue, vec_queue: Queue, cfg: IndexingConfig):
+        logger = setup_logger("embedder", "logs/pipeline/embedder.json")
         logger.info("Embedder process started")
-        embedder = Embedder(self.cfg.embedding_model, batch_size=self.cfg.batch_size)
-        chunker = TextChunker(self.cfg.chunk_size, self.cfg.chunk_overlap)
+
+        embedder = Embedder(cfg.embedding_model, batch_size=cfg.batch_size)
+        chunker = TextChunker(cfg.chunk_size, cfg.chunk_overlap)
 
         items_seen = 0
         chunks_emitted = 0
@@ -73,7 +81,7 @@ class IndexingPipelineMP:
             nonlocal items_seen, chunks_emitted
             while True:
                 try:
-                    item = self.raw_queue.get(timeout=5)
+                    item = raw_queue.get(timeout=5)
                 except Empty:
                     continue
                 if item is None:
@@ -94,7 +102,7 @@ class IndexingPipelineMP:
         for vectors, metas in embedder.embed_stream(stream_chunks()):
             while True:
                 try:
-                    self.vec_queue.put((vectors, metas), timeout=5)
+                    vec_queue.put((vectors, metas), timeout=5)
                     break
                 except Full:
                     logger.warning("Vector queue full, waiting to enqueue batch")
@@ -107,7 +115,7 @@ class IndexingPipelineMP:
                 )
                 first_batch_logged = True
 
-            if vectors_emitted % self.log_every < vectors.shape[0]:
+            if vectors_emitted % cfg.log_every < vectors.shape[0]:
                 elapsed = time.time() - start_time
                 rate = vectors_emitted / max(elapsed, 1e-6)
                 logger.info(
@@ -115,17 +123,23 @@ class IndexingPipelineMP:
                     items_seen, chunks_emitted, vectors_emitted, rate
                 )
 
-    # Writer worker process
-    def _writer_worker(self):
+        logger.info("Embedder process finished")
+
+    # -----------------------------
+    # Writer process target
+    # -----------------------------
+    @staticmethod
+    def _writer_worker(vec_queue: Queue, index_path: Path, meta_path: Path, cfg: IndexingConfig):
+        logger = setup_logger("writer", "logs/pipeline/faiss_writer.json")
         logger.info("FAISS writer process started")
+
+        store: FaissStore | None = None
         vectors_written = 0
         start_time = time.time()
 
-        store: Optional[FaissStore] = None
-
         while True:
             try:
-                item = self.vec_queue.get(timeout=5)
+                item = vec_queue.get(timeout=5)
             except Empty:
                 continue
 
@@ -135,29 +149,28 @@ class IndexingPipelineMP:
             vectors, metas = item
 
             if store is None:
-                dim = vectors.shape[1]
-                store = FaissStore(dim=dim)
-                logger.info("FAISS store initialized | dim=%d", dim)
+                store = FaissStore(dim=vectors.shape[1])
+                logger.info("FAISS store initialized | dim=%d", vectors.shape[1])
 
             store.add(vectors, metas)
             vectors_written += vectors.shape[0]
 
-            if vectors_written % self.log_every < vectors.shape[0]:
+            if vectors_written % cfg.log_every < vectors.shape[0]:
                 rate = vectors_written / max(time.time() - start_time, 1e-6)
                 logger.info(
                     "Indexing progress | vectors=%d | rate=%.1f vec/s",
                     vectors_written, rate
                 )
 
-            if vectors_written % self.save_every < vectors.shape[0]:
-                store.save(self.index_path, self.meta_path)
+            if vectors_written % cfg.save_every < vectors.shape[0]:
+                store.save(index_path, meta_path)
                 logger.info(
                     "Checkpoint saved | vectors=%d | path=%s",
-                    vectors_written, self.vec_queue
+                    vectors_written, index_path
                 )
 
         if store is not None:
-            store.save(self.index_path, self.meta_path)
+            store.save(index_path, meta_path)
             logger.info(
                 "Final FAISS index saved | vectors=%d | runtime=%.1fs",
                 vectors_written, time.time() - start_time

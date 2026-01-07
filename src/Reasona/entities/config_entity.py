@@ -7,17 +7,19 @@ from typing import Optional
 from dataclasses import dataclass
 from typing import Optional
 
-@dataclass
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+@dataclass(frozen=True)
 class PreprocessConfig:
-    dataset_name: str
-    split: str
-    revision: Optional[str]
-    cache_dir: Optional[str]
-    max_samples: Optional[int]
-    shuffle_buffer: Optional[int]
-    prefetch_buffer: Optional[int]
-    language: Optional[str] 
-    schema_path: Optional[Path]
+    dataset_name: str                    
+    dataset_config: Optional[str] = None 
+    split: str = "train"                
+    cache_dir: Optional[Path] = None     
+    shuffle_buffer: int = 0              
+    max_samples: Optional[int] = None    
+    schema_path: Optional[Path] = None   
 
 @dataclass(frozen=True)
 class TrainingConfig:

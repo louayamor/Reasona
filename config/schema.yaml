@@ -1,23 +1,24 @@
 dataset:
-  name: codelion/synth-1B
+  name: wikimedia/wikipedia
   source: huggingface
+  config: 20231101.en
 
 columns:
-  text:
-    type: string
-    role: content
-    
-  synth_id:
+  id:
     type: string
     role: id
 
-  language:
+  url:
     type: string
     role: metadata
 
-  exercise:
+  title:
     type: string
     role: metadata
+
+  text:
+    type: string
+    role: content
 
 target:
   name: text
@@ -27,6 +28,6 @@ indexing:
     - text
 
   metadata_fields:
-    - synth_id
-    - language
-    - exercise
+    - id
+    - title
+    - url

@@ -1,5 +1,6 @@
 from pathlib import Path
 from Reasona.utils.helpers import read_yaml
+from typing import Optional
 from Reasona.entities.config_entity import (
     PreprocessConfig,
     TrainingConfig,
@@ -23,16 +24,19 @@ class ConfigurationManager:
         self.params = read_yaml(params_filepath)
 
     def get_preprocess_config(self) -> PreprocessConfig:
-        cfg = self.config["preprocess"]
+        cfg = self.config.get("preprocess", {})
+
+        def _to_int(value: Optional[int | str], default: Optional[int] = None) -> Optional[int]:
+            if value is None:
+                return default
+            return int(value)
 
         return PreprocessConfig(
             dataset_name=cfg["dataset_name"],
+            dataset_config=cfg.get("dataset_config"),
             split=cfg.get("split", "train"),
-            shuffle_buffer=int(cfg.get("shuffle_buffer")),
-            max_samples=cfg.get("max_samples"),
-            revision=cfg.get("revision"),
-            prefetch_buffer=cfg.get("prefetch_buffer"),
-            language=cfg.get("language", "en"),
+            shuffle_buffer=_to_int(cfg.get("shuffle_buffer"), default=0),
+            max_samples=_to_int(cfg.get("max_samples")),
             cache_dir=Path(cfg["cache_dir"]).expanduser() if cfg.get("cache_dir") else None,
             schema_path=Path(cfg["schema_path"]) if cfg.get("schema_path") else None,
         )

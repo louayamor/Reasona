@@ -7,7 +7,6 @@ logger = setup_logger(__name__, "logs/pipeline/validator.json")
 
 
 class Validator:
-
     def __init__(self, schema_path: str):
         schema_file = Path(schema_path)
         if not schema_file.exists():
@@ -19,23 +18,19 @@ class Validator:
         self.required_columns: Dict[str, type] = {}
         for col, meta in self.schema.get("columns", {}).items():
             dtype = meta.get("type", "string")
-
-            if dtype == "string":
-                self.required_columns[col] = str
-            elif dtype == "int":
-                self.required_columns[col] = int
-            elif dtype == "float":
-                self.required_columns[col] = float
-            elif dtype == "bool":
-                self.required_columns[col] = bool
-            else:
-                self.required_columns[col] = str  
+            self.required_columns[col] = self._map_dtype(dtype)
 
         self.text_fields: List[str] = self.schema.get("indexing", {}).get("text_fields", [])
         self.metadata_fields: List[str] = self.schema.get("indexing", {}).get("metadata_fields", [])
 
-    def validate(self, sample: Dict[str, Any]) -> bool:
+    @staticmethod
+    def _map_dtype(dtype: str) -> type:
 
+        mapping = {"string": str, "int": int, "float": float, "bool": bool}
+        return mapping.get(dtype, str)
+
+    def validate(self, sample: Dict[str, Any]) -> bool:
+        
         for col, col_type in self.required_columns.items():
             if col not in sample:
                 logger.warning(f"Missing column '{col}' in sample: {list(sample.keys())}")
@@ -52,3 +47,7 @@ class Validator:
                 return False
 
         return True
+
+    def is_valid(self, sample: Dict[str, Any]) -> bool:
+        
+        return self.validate(sample)

@@ -21,13 +21,13 @@ class IndexingPipeline:
         self.vector_db_dir.mkdir(parents=True, exist_ok=True)
 
         self.raw_queue = Queue(maxsize=cfg.queue_size)
-        self.vec_queue = Queue(maxsize=cfg.queue_size)
+        self.vec_queue = Queue(maxsize=cfg.queue_size * 3)
 
         self.embedder_thread: Optional[Thread] = None
         self.writer_thread: Optional[Thread] = None
 
-        self.log_every = cfg.log_every or 50_000
-        self.save_every = cfg.save_every or 100_000  
+        self.log_every = cfg.log_every
+        self.save_every = cfg.save_every 
 
         self.store: Optional[FaissStore] = None
 
@@ -116,27 +116,17 @@ class IndexingPipeline:
         logger.info("FAISS writer started")
 
         vectors_written = 0
-        all_metadata = []  
         start_time = time.time()
 
-        index_files = sorted(glob.glob(str(self.vector_db_dir / "*.index")))
-        if index_files:
-            latest_index_path = index_files[-1]
-            self.store = FaissStore(dim=384)  
-            self.store.load(latest_index_path)
-            meta_path = Path(latest_index_path).with_suffix(".pkl")
-            if meta_path.exists():
-                with open(meta_path, "rb") as f:
-                    all_metadata = pickle.load(f)
-            logger.info("Loaded FAISS index from %s with %d vectors", latest_index_path, len(all_metadata))
-        else:
-            self.store = None
+        self.store = None
+        save_path = self.vector_db_dir  
 
         while True:
             try:
                 item = self.vec_queue.get(timeout=5)
             except Empty:
                 continue
+
             if item is None:
                 break
 
@@ -145,34 +135,31 @@ class IndexingPipeline:
             if self.store is None:
                 dim = vectors.shape[1]
                 self.store = FaissStore(dim=dim)
-                logger.info("FAISS initialized | dim=%d", dim)
+                logger.info("FAISS store initialized | dim=%d", dim)
 
             self.store.add(vectors, metas)
-            all_metadata.extend(metas)
             vectors_written += vectors.shape[0]
 
             if vectors_written % self.log_every < vectors.shape[0]:
                 rate = vectors_written / max(time.time() - start_time, 1e-6)
                 logger.info(
-                    "Indexing progress | vectors=%d total=%d | rate=%.1f vec/s",
-                    vectors_written, len(self.store.metadata), rate
+                    "Indexing progress | vectors=%d | rate=%.1f vec/s",
+                    vectors_written, rate
                 )
 
             if vectors_written % self.save_every < vectors.shape[0]:
-                index_path = self.vector_db_dir / f"index_{int(time.time())}.index"
-                self.store.save(index_path)
-                meta_path = index_path.with_suffix(".pkl")
-                with open(meta_path, "wb") as f:
-                    pickle.dump(all_metadata, f)
-                logger.info("Incremental save | path=%s | total_vectors=%d", index_path, len(all_metadata))
+                self.store.save(save_path)
+                logger.info(
+                    "Checkpoint saved | vectors=%d | path=%s",
+                    vectors_written, save_path
+                )
 
         if self.store is not None:
-            index_path = self.vector_db_dir / f"index_{int(time.time())}.index"
-            self.store.save(index_path)
-            meta_path = index_path.with_suffix(".pkl")
-            with open(meta_path, "wb") as f:
-                pickle.dump(all_metadata, f)
-            logger.info("Vector store saved | path=%s total_vectors=%d | runtime=%.1fs",
-                        index_path, len(all_metadata), time.time() - start_time)
+            self.store.save(save_path)
+            logger.info(
+                "Final FAISS index saved | vectors=%d | runtime=%.1fs",
+                vectors_written, time.time() - start_time
+            )
 
         logger.info("FAISS writer finished")
+

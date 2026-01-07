@@ -3,6 +3,10 @@ dataset:
   source: huggingface
 
 columns:
+  text:
+    type: string
+    role: content
+    
   synth_id:
     type: string
     role: id
@@ -14,10 +18,6 @@ columns:
   exercise:
     type: string
     role: metadata
-
-  text:
-    type: string
-    role: content
 
 target:
   name: text

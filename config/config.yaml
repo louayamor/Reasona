@@ -5,10 +5,11 @@ preprocess:
   split: train
   language: en
   revision: main
-  max_samples: null
+  max_samples: 100000
   cache_dir: ~/.cache/huggingface/datasets
   shuffle_buffer: 1000
   prefetch_buffer: 512
+  schema_path: config/dataset_schema.yaml 
 
 
 
@@ -21,13 +22,19 @@ training:
 indexing:
   vector_store_dir: artifacts/vectors
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
-  chunk_size: 500
-  chunk_overlap: 50
-  batch_size: 64
-  queue_size: 100
-  log_every: 100000
-  save_every: 200000
-  keep_versions: 5
+
+  chunk_size: 600
+  chunk_overlap: 0
+
+  batch_size: 32
+
+  queue_size: 500
+
+  log_every: 20000
+  save_every: 20000
+
+  keep_versions: 1
+
 
 
 inference:

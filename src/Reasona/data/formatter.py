@@ -1,24 +1,44 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+import yaml
+from pathlib import Path
 from Reasona.utils.logger import setup_logger
 
 logger = setup_logger(__name__, "logs/data/formatter.json")
 
 
 class DataFormatter:
-    def format_sample(self, sample: Dict[str, Any]) -> Dict[str, Any]:
+    def __init__(self, schema_path: str = "dataset_schema.yaml", language: Optional[str] = None):
+
+        self.schema_path = Path(schema_path)
+        if not self.schema_path.exists():
+            raise FileNotFoundError(f"Dataset schema not found: {self.schema_path}")
+
+        with open(self.schema_path, "r") as f:
+            schema = yaml.safe_load(f)
+
+        self.content_fields = [
+            k for k, v in schema.get("columns", {}).items() if v.get("role") == "content"
+        ]
+        self.metadata_fields = [
+            k for k, v in schema.get("columns", {}).items() if v.get("role") == "metadata"
+        ]
+
+        self.language = language
+
+    def format_sample(self, sample: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        
+        if self.language:
+            sample_lang = sample.get("language")
+            if sample_lang != self.language:
+                return None
+
         text_parts = []
-
-        exercise = sample.get("exercise")
-        if isinstance(exercise, dict):
-            for key in ("instruction", "input", "output"):
-                val = exercise.get(key)
-                if isinstance(val, str) and val.strip():
-                    text_parts.append(val.strip())
-
-        if not text_parts:
-            raw_text = sample.get("text")
-            if isinstance(raw_text, str) and raw_text.strip():
-                text_parts.append(raw_text.strip())
+        for field in self.content_fields:
+            val = sample.get(field)
+            if isinstance(val, dict):
+                text_parts.extend(str(v).strip() for v in val.values() if isinstance(v, str) and v.strip())
+            elif isinstance(val, str) and val.strip():
+                text_parts.append(val.strip())
 
         final_text = "\n\n".join(text_parts)
 
@@ -27,10 +47,12 @@ class DataFormatter:
                 "Formatted text is empty | sample keys=%s",
                 list(sample.keys()),
             )
+            return None
+
+        metadata = {field: sample.get(field) for field in self.metadata_fields}
 
         return {
             "text": final_text,
-            "language": sample.get("language"),
-            "synth_id": sample.get("synth_id"),
+            **metadata,
             "_metadata": sample,  
         }

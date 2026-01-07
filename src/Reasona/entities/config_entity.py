@@ -13,16 +13,11 @@ class PreprocessConfig:
     split: str
     revision: Optional[str]
     cache_dir: Optional[str]
-
     max_samples: Optional[int]
-
     shuffle_buffer: Optional[int]
     prefetch_buffer: Optional[int]
-
-    language: Optional[str] = "en"
-
-
-
+    language: Optional[str] 
+    schema_path: Optional[Path]
 
 @dataclass(frozen=True)
 class TrainingConfig:
@@ -38,23 +33,23 @@ class IndexingConfig:
     chunk_overlap: int
     batch_size: int
     queue_size: int
-    log_every: Optional[int] = 50_000     
-    save_every: Optional[int] = 100_000 
+    log_every: Optional[int]    
+    save_every: Optional[int]
     keep_versions: int = 5
 
 
 @dataclass(frozen=True)
 class RetrievalConfig:
-    vector_store_dir: Path                 # directory with FAISS / vector store
-    top_k: int = 5                         # number of results to retrieve
+    vector_store_dir: Path                
+    top_k: int = 5                         
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    engine: str = "vector_search"          # retrieval engine type
+    engine: str = "vector_search"         
 
 
 @dataclass(frozen=True)
 class InferenceConfig:
-    model_path: Path                        # path to trained/generation model
-    tokenizer_path: Optional[Path] = None   # optional tokenizer path
-    engine: str = "transformer"             # inference engine type
+    model_path: Path                        
+    tokenizer_path: Optional[Path] = None   
+    engine: str = "transformer"            
     max_tokens: int = 256
     temperature: float = 0.7

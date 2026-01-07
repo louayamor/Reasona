@@ -32,21 +32,8 @@ class ConfigurationManager:
             revision=cfg.get("revision"),
             prefetch_buffer=cfg.get("prefetch_buffer"),
             language=cfg.get("language", "en"),
-            cache_dir=Path(cfg["cache_dir"]).expanduser()
-            if cfg.get("cache_dir")
-            else None,
-        )
-
-
-    def get_training_config(self) -> TrainingConfig:
-        cfg = self.config.get("training")
-        if not cfg:
-            raise ValueError("Missing 'training' section in config.yaml")
-
-        return TrainingConfig(
-            dataset_path=Path(require(cfg, "dataset_path", "training")),
-            output_dir=Path(require(cfg, "output_dir", "training")),
-            base_model=require(cfg, "base_model", "training"),
+            cache_dir=Path(cfg["cache_dir"]).expanduser() if cfg.get("cache_dir") else None,
+            schema_path=Path(cfg["schema_path"]) if cfg.get("schema_path") else None,
         )
 
     def get_indexing_config(self) -> IndexingConfig:
@@ -61,11 +48,24 @@ class ConfigurationManager:
             chunk_overlap=int(require(cfg, "chunk_overlap", "indexing")),
             batch_size=int(require(cfg, "batch_size", "indexing")),
             queue_size=int(require(cfg, "queue_size", "indexing")),
-            log_every=int(cfg.get("log_every", 50_000)),
-            save_every=int(cfg.get("save_every", 100_000)),
-            keep_versions=int(cfg.get("keep_versions", 5)),
+            log_every=int(cfg.get("log_every")),
+            save_every=int(cfg.get("save_every")),
+            keep_versions=int(cfg.get("keep_versions")),
+        )
+        
+
+    def get_training_config(self) -> TrainingConfig:
+        cfg = self.config.get("training")
+        if not cfg:
+            raise ValueError("Missing 'training' section in config.yaml")
+
+        return TrainingConfig(
+            dataset_path=Path(require(cfg, "dataset_path", "training")),
+            output_dir=Path(require(cfg, "output_dir", "training")),
+            base_model=require(cfg, "base_model", "training"),
         )
 
+    
     def get_inference_config(self) -> InferenceConfig:
         cfg = self.config.get("inference")
         if not cfg:

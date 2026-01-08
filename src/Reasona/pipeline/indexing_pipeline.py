@@ -58,9 +58,6 @@ class IndexingPipeline:
         self.writer_thread.join()
         print("=== INDEXING PIPELINE FINISHED ===")
 
-    # -----------------------------
-    # Embedder thread target
-    # -----------------------------
     @staticmethod
     def _embedder_worker(raw_queue: Queue, vec_queue: Queue, cfg: IndexingConfig):
         logger = setup_logger("embedder", "logs/pipeline/embedder.json")
@@ -123,16 +120,23 @@ class IndexingPipeline:
 
         logger.info("Embedder thread finished")
 
-    # -----------------------------
-    # Writer thread target
-    # -----------------------------
+
     @staticmethod
     def _writer_worker(vec_queue: Queue, index_path: Path, meta_path: Path, cfg: IndexingConfig):
         logger = setup_logger("writer", "logs/pipeline/faiss_writer.json")
         logger.info("FAISS writer thread started")
 
-        store: FaissStore | None = None
-        vectors_written = 0
+        store: FaissStore
+        if index_path.exists() and meta_path.exists():
+            store = FaissStore.load(index_path, meta_path)
+            processed_ids = set(store.metadata)  
+            vectors_written = store.ntotal
+            logger.info("Loaded existing FAISS index | vectors=%d", vectors_written)
+        else:
+            store = None
+            processed_ids = set()
+            vectors_written = 0
+
         start_time = time.time()
 
         while True:
@@ -146,21 +150,31 @@ class IndexingPipeline:
 
             vectors, metas = item
 
-            if store is None:
-                store = FaissStore(dim=vectors.shape[1])
-                logger.info("FAISS store initialized | dim=%d", vectors.shape[1])
+            filtered_vectors = []
+            filtered_metas = []
+            for vec, meta in zip(vectors, metas):
+                chunk_id = meta.get("chunk_id") or meta.get("text")  # unique identifier
+                if chunk_id not in processed_ids:
+                    filtered_vectors.append(vec)
+                    filtered_metas.append(meta)
+                    processed_ids.add(chunk_id)
 
-            store.add(vectors, metas)
-            vectors_written += vectors.shape[0]
+            if not filtered_vectors:
+                continue  
 
-            if vectors_written % cfg.log_every < vectors.shape[0]:
+            vectors_to_add = np.vstack(filtered_vectors)  
+            store = store or FaissStore(dim=vectors_to_add.shape[1])
+            store.add(vectors_to_add, filtered_metas)
+            vectors_written += len(filtered_vectors)
+
+            if vectors_written % cfg.log_every < len(filtered_vectors):
                 rate = vectors_written / max(time.time() - start_time, 1e-6)
                 logger.info(
                     "Indexing progress | vectors=%d | rate=%.1f vec/s",
                     vectors_written, rate
                 )
 
-            if vectors_written % cfg.save_every < vectors.shape[0]:
+            if vectors_written % cfg.save_every < len(filtered_vectors):
                 store.save(index_path, meta_path)
                 logger.info(
                     "Checkpoint saved | vectors=%d | path=%s",
@@ -175,3 +189,4 @@ class IndexingPipeline:
             )
 
         logger.info("FAISS writer thread finished")
+

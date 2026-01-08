@@ -1,9 +1,10 @@
+import time
+from typing import Iterable, Iterator, List, Dict, Tuple, Optional
+
 import torch
 import numpy as np
-from typing import Iterable, Iterator, List, Dict, Optional
 from sentence_transformers import SentenceTransformer
 from Reasona.utils.logger import setup_logger
-import time
 
 logger = setup_logger(__name__, "logs/data/embedder.json")
 
@@ -12,100 +13,106 @@ class Embedder:
     def __init__(
         self,
         model_name: str,
-        batch_size: int = 32,
+        batch_size: int,
+        log_every: int,
         device: Optional[str] = None,
-        log_every: int = 50_000,
     ):
+        
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.batch_size = batch_size
         self.log_every = log_every
-        self.model_name = model_name
+
         self.model = SentenceTransformer(model_name, device=self.device)
-        logger.info("Embedding model loaded on %s: %s", self.device, model_name)
+        self.model.eval()
+
+        logger.info(
+            "Embedding model loaded | device=%s model=%s | batch_size=%d",
+            self.device,
+            model_name,
+            self.batch_size,
+        )
 
     def embed_stream(
-        self, items: Iterable[Dict[str, any]]
-    ) -> Iterator[tuple[np.ndarray, List[Dict[str, any]]]]:
-
-        buffer_texts: List[str] = []
-        buffer_meta: List[Dict] = []
-        total_items = 0
+        self, items: Iterable[Dict[str, str]]
+    ) -> Iterator[Tuple[np.ndarray, List[Dict]]]:
+        texts: List[str] = []
+        metas: List[Dict] = []
         total_vectors = 0
         total_batches = 0
         start_time = time.time()
-        first_batch_time: Optional[float] = None
+        first_batch = True
 
-        for idx, item in enumerate(items, start=1):
-            if not isinstance(item, dict):
-                raise TypeError(f"Expected dict, got {type(item)} at index {idx}")
-
-            text = item.get("text", "")
-            metadata = item.get("_metadata", item)  
-
-            if not text.strip():
-                if idx % 10_000 == 0:
-                    logger.warning("Skipping empty item at index %d", idx)
+        for item in items:
+            text = item.get("text", "").strip()
+            if not text:
                 continue
 
-            buffer_texts.append(text)
-            buffer_meta.append(metadata)
-            total_items += 1
+            texts.append(text)
+            metas.append(self._strip_text(item))
 
-            if len(buffer_texts) >= self.batch_size:
-                vectors, metas = self._flush(buffer_texts, buffer_meta)
-                total_vectors += vectors.shape[0]
+            if len(texts) >= self.batch_size:
+                vectors = self._encode(texts)
+                total_vectors += len(vectors)
                 total_batches += 1
-                buffer_texts, buffer_meta = [], []
-
-                if first_batch_time is None:
-                    first_batch_time = time.time()
-                    logger.info(
-                        "First batch embedded | startup_time=%.2fs | batch_size=%d",
-                        first_batch_time - start_time,
-                        vectors.shape[0],
-                    )
-
-                if total_vectors % self.log_every < self.batch_size:
-                    elapsed = time.time() - start_time
-                    logger.info(
-                        "Embedding progress | items=%d vectors=%d batches=%d | avg_rate=%.1f vec/s",
-                        total_items, total_vectors, total_batches,
-                        total_vectors / max(elapsed, 1e-6),
-                    )
+                self._log_progress(start_time, total_vectors, total_batches, first_batch)
+                first_batch = False
 
                 yield vectors, metas
+                texts.clear()
+                metas.clear()
 
-        if buffer_texts:
-            vectors, metas = self._flush(buffer_texts, buffer_meta)
-            total_vectors += vectors.shape[0]
+        if texts:
+            vectors = self._encode(texts)
+            total_vectors += len(vectors)
             total_batches += 1
             yield vectors, metas
 
-        elapsed_total = time.time() - start_time
-        logger.info(
-            "Embedding finished | total_items=%d total_vectors=%d total_batches=%d runtime=%.2fs | avg_rate=%.1f vec/s",
-            total_items, total_vectors, total_batches, elapsed_total,
-            total_vectors / max(elapsed_total, 1e-6),
-        )
-
-    def _flush(
-        self, texts: List[str], metas: List[Dict]
-    ) -> tuple[np.ndarray, List[Dict]]:
-        vectors = self.model.encode(
-            texts,
-            batch_size=len(texts),
-            show_progress_bar=False,
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-        ).astype("float32")
-        return vectors, metas
+        self._log_final(start_time, total_vectors, total_batches)
 
     def embed(self, texts: List[str]) -> np.ndarray:
-        vectors = self.model.encode(
-            texts,
-            batch_size=len(texts),
-            show_progress_bar=False,
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-        ).astype("float32")
-        return vectors
+        return self._encode(texts)
+
+    def _encode(self, texts: List[str]) -> np.ndarray:
+        with torch.no_grad():
+            vectors = self.model.encode(
+                texts,
+                batch_size=len(texts),
+                convert_to_numpy=True,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
+        return vectors.astype(np.float32, copy=False)
+
+    @staticmethod
+    def _strip_text(item: Dict) -> Dict:
+        meta = dict(item)
+        meta.pop("text", None)
+        return meta
+
+    def _log_progress(
+        self, start_time: float, total_vectors: int, total_batches: int, first_batch: bool
+    ):
+        elapsed = time.time() - start_time
+        if first_batch:
+            logger.info(
+                "First batch embedded | startup_time=%.2fs | batch_size=%d",
+                elapsed,
+                self.batch_size,
+            )
+        if total_vectors % self.log_every < self.batch_size:
+            logger.info(
+                "Embedding progress | vectors=%d batches=%d | avg_rate=%.1f vec/s",
+                total_vectors,
+                total_batches,
+                total_vectors / max(elapsed, 1e-6),
+            )
+
+    def _log_final(self, start_time: float, total_vectors: int, total_batches: int):
+        elapsed = time.time() - start_time
+        logger.info(
+            "Embedding finished | vectors=%d batches=%d runtime=%.1fs | avg_rate=%.1f vec/s",
+            total_vectors,
+            total_batches,
+            elapsed,
+            total_vectors / max(elapsed, 1e-6),
+        )

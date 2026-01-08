@@ -14,12 +14,12 @@ preprocess:
 indexing:
   vector_store_dir: artifacts/vectors
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
-  chunk_size: 700 # using bigger chunk to reduce overhead, fits my gpu memory
+  chunk_size: 600 # using bigger chunk to reduce overhead, fits my gpu memory
   chunk_overlap: 50 # overlapping chunks to improve retrieval accuracy
-  batch_size: 32 # depending on my gpu usage (rtx 2050 )
-  queue_size: 1200
-  log_every: 500000
-  save_every: 500000
+  batch_size: 8 # depending on my gpu usage (rtx 2050 )
+  queue_size: 64
+  log_every: 50000
+  save_every: 50000
 
 training:
   dataset_path: artifacts/dataset

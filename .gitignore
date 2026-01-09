@@ -12,7 +12,7 @@ venv/
 env/
 ENV/
 
-artifacts/
+/artifacts/vectors/*
 
 research/
 

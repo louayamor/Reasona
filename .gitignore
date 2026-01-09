@@ -12,7 +12,7 @@ venv/
 env/
 ENV/
 
-/artifacts/vectors/*
+/artifacts/*
 
 research/
 
@@ -33,7 +33,7 @@ logs/
 data_cache/
 
 # IDE/editor
-.vscode/
+.vscode/*
 .idea/
 
 # OS files

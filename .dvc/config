@@ -1,0 +1,4 @@
+[core]
+    remote = origin
+['remote "origin"']
+    url = https://louayamor:90e8df9b533dd1721c9af5b82df0423353c176c5@dagshub.com/louayamor/Reasona.dvc

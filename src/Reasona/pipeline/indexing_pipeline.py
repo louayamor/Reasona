@@ -119,9 +119,6 @@ class IndexingPipeline:
 
         return True
 
-    # -------------------------
-    # Logging / Persistence
-    # -------------------------
     def _log_progress(self):
         elapsed = max(time.time() - self.start_time, 1e-6)
         rate = self.vectors_written / elapsed

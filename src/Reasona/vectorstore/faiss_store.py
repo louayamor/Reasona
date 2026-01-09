@@ -32,7 +32,6 @@ class FaissStore:
         self.train_threshold = max(train_threshold, nlist)
         self.max_vectors = max_vectors
 
-        # ---------- FAISS ----------
         quantizer = faiss.IndexFlatL2(dim)
         if pq:
             self.index = faiss.IndexIVFPQ(quantizer, dim, nlist, pq, 8)
@@ -42,11 +41,11 @@ class FaissStore:
         self.index.nprobe = nprobe
         self.is_trained = False
 
-        # ---------- Buffers ----------
+        # buffers 
         self._train_vectors: List[np.ndarray] = []
         self._pending_vectors: List[np.ndarray] = []
 
-        # ---------- SQLite ----------
+        # sqlite
         self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
         self.cursor.execute(
@@ -59,9 +58,6 @@ class FaissStore:
         )
         self.conn.commit()
 
-    # -------------------------
-    # Properties
-    # -------------------------
     @property
     def ntotal(self) -> int:
         return self.index.ntotal
@@ -70,9 +66,6 @@ class FaissStore:
     def is_full(self) -> bool:
         return self.max_vectors is not None and self.ntotal >= self.max_vectors
 
-    # -------------------------
-    # Add vectors
-    # -------------------------
     def add(self, vectors: np.ndarray, metas: List[Dict]) -> int:
         if self.is_full:
             return 0
@@ -86,7 +79,6 @@ class FaissStore:
             vectors = vectors[:remaining]
             metas = metas[:remaining]
 
-        # 1. Insert metadata FIRST (IDs must match vector order)
         metas_json = [(json.dumps(m),) for m in metas]
         self.cursor.executemany(
             "INSERT INTO metadata (data) VALUES (?)",
@@ -94,7 +86,6 @@ class FaissStore:
         )
         self.conn.commit()
 
-        # 2. Handle training vs adding
         if not self.is_trained:
             self._train_vectors.append(vectors)
             self._pending_vectors.append(vectors)
@@ -104,9 +95,7 @@ class FaissStore:
         self.index.add(vectors)
         return len(vectors)
 
-    # -------------------------
-    # Training
-    # -------------------------
+    
     def _train_once(self):
         if self.is_trained:
             return
@@ -118,7 +107,6 @@ class FaissStore:
         train_vectors = np.vstack(self._train_vectors)
         self.index.train(train_vectors)
 
-        # IMPORTANT: add all buffered vectors AFTER training
         pending = np.vstack(self._pending_vectors)
         self.index.add(pending)
 
@@ -126,9 +114,6 @@ class FaissStore:
         self._pending_vectors.clear()
         self.is_trained = True
 
-    # -------------------------
-    # Search
-    # -------------------------
     def search(self, query: np.ndarray, k: int = 5):
         if not self.is_trained or self.ntotal == 0:
             return [], []
@@ -150,9 +135,6 @@ class FaissStore:
 
         return distances[0], results
 
-    # -------------------------
-    # Persistence
-    # -------------------------
     def save(self):
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
         faiss.write_index(self.index, str(self.index_path))

@@ -28,14 +28,17 @@ class IndexingConfig:
     queue_size: int
     log_every: Optional[int]    
     save_every: Optional[int]
-
+    max_vectors: Optional[int] = None
 
 @dataclass(frozen=True)
 class RetrievalConfig:
     vector_store_dir: Path                
     top_k: int                        
     embedding_model: str 
-    engine: str         
+    engine: str     
+    embedding_dim: int
+    use_cache: bool = True
+    max_workers: int = 4    
 
 
 @dataclass(frozen=True)

@@ -18,6 +18,7 @@ indexing:
   chunk_overlap: 32 # overlapping chunks to improve retrieval accuracy
   batch_size: 16 # depending on my gpu usage (rtx 2050 )
   queue_size: 16
+  max_vectors: 4500000
   log_every: 50000
   save_every: 50000
 
@@ -41,6 +42,10 @@ inference:
 retrieval:
   vector_store_dir: artifacts/vectors
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  embedding_dim: 384       
   top_k: 5
   engine: vector_search
+  max_workers: 4            
+  use_cache: true           
+
 

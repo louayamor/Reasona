@@ -55,9 +55,9 @@ class ConfigurationManager:
             queue_size=int(require(cfg, "queue_size", "indexing")),
             log_every=int(cfg.get("log_every")),
             save_every=int(cfg.get("save_every")),
+            max_vectors=int(cfg.get("max_vectors")) if cfg.get("max_vectors") is not None else None,
         )
         
-
     def get_retrieval_config(self) -> RetrievalConfig:
         cfg = self.config.get("retrieval")
         if not cfg:
@@ -68,6 +68,9 @@ class ConfigurationManager:
             top_k=int(require(cfg, "top_k", "retrieval")),
             embedding_model=require(cfg, "embedding_model", "retrieval"),
             engine=require(cfg, "engine", "retrieval"),
+            embedding_dim=int(require(cfg, "embedding_dim", "retrieval")),
+            use_cache=bool(cfg.get("use_cache", True)),
+            max_workers=int(cfg.get("max_workers", 4)),
         )
 
     def get_training_config(self) -> TrainingConfig:

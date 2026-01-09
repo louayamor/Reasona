@@ -27,9 +27,10 @@ class TextChunker:
             end = start + self.chunk_size
 
             yield {
-                "chunk_id": str(uuid4()),
+                "id": str(uuid4()),               
                 "text": " ".join(words[start:end]),
                 "source": item.get("source"),
+                "original_id": item.get("id"),
             }
 
             start += self.chunk_size - self.overlap

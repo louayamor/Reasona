@@ -1,39 +1,80 @@
 from pathlib import Path
-import pickle
-import faiss
+import sqlite3
+import json
+import numpy as np
+
 from Reasona.vectorstore.faiss_store import FaissStore
+from Reasona.data.embedder import Embedder
+
+
+INDEX_PATH = Path("artifacts/vectors/index.faiss")
+DB_PATH = Path("artifacts/vectors/metadata.db")
+DIM = 384  # all-MiniLM-L6-v2
+
+
+def show_first_10_samples(db_path: Path):
+    print("\n=== FIRST 10 STORED SAMPLES ===")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, data FROM metadata ORDER BY id ASC LIMIT 10"
+    )
+    rows = cursor.fetchall()
+
+    for row_id, data in rows:
+        meta = json.loads(data)
+        text = meta.get("text", "<no text>")[:300]
+        print(f"[{row_id}] {text}")
+        print("-" * 60)
+
+    conn.close()
+
+
+def run_search_tests(store: FaissStore):
+    embedder = Embedder(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        device="cuda"
+    )
+
+    queries = [
+        "American Civil War soldier",
+        "Japanese anime soundtrack composer",
+        "small village in Iran",
+    ]
+
+    for i, q in enumerate(queries):
+        q_vec = embedder.embed([q])
+        distances, results = store.search(q_vec, k=5)
+
+        print(f"\n[QUERY {i}] {q}")
+        if not results:
+            print("  No results found.")
+            continue
+
+        for rank, (dist, meta) in enumerate(zip(distances, results)):
+            snippet = meta.get("text", "<no text>")[:120]
+            print(f"  [{rank}] dist={dist:.4f} | {snippet}")
+
 
 def main():
-    store_dir = Path("artifacts/vectors")
-    index_file = store_dir / "index.faiss"
-
-    if not index_file.exists():
-        print("FAISS index file not found!")
+    if not INDEX_PATH.exists() or not DB_PATH.exists():
+        print("Index or metadata DB not found.")
         return
 
-    index = faiss.read_index(str(index_file))
-    store = FaissStore(dim=index.d)
-    store.index = index
-
-    meta_path = store_dir / "meta.pkl"
-    if meta_path.exists():
-        with open(meta_path, "rb") as f:
-            store.metadata = pickle.load(f)
-    else:
-        print("Metadata file not found, only vectors loaded.")
-        store.metadata = []
+    store = FaissStore(
+        dim=DIM,
+        index_path=INDEX_PATH,
+        db_path=DB_PATH,
+    )
+    store.load()
 
     print(f"Loaded FAISS index with {store.ntotal} vectors")
-    print("-" * 50)
 
-    n_preview = min(10, store.ntotal)
-    for i in range(n_preview):
-        vector = store.index.reconstruct(i)
-        meta = store.metadata[i] if i < len(store.metadata) else {}
-        text = meta.get("text") or "<no text>"
-        print(f"[{i}] text: {text[:200]}{'...' if len(text) > 200 else ''}")
-        print(f"    vector snippet: {vector[:10]} ...")
-        print("-" * 50)
+    show_first_10_samples(DB_PATH)
+    run_search_tests(store)
+
+    store.close()
 
 
 if __name__ == "__main__":

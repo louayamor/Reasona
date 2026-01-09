@@ -6,9 +6,8 @@ import numpy as np
 from Reasona.vectorstore.faiss_store import FaissStore
 from Reasona.data.embedder import Embedder
 
-
-INDEX_PATH = Path("artifacts/vectors/index.faiss")
-DB_PATH = Path("artifacts/vectors/metadata.db")
+INDEX_PATH = Path("../artifacts/vectors/index.faiss")
+DB_PATH = Path("../artifacts/vectors/metadata.db")
 DIM = 384  # all-MiniLM-L6-v2
 
 
@@ -17,9 +16,7 @@ def show_first_10_samples(db_path: Path):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT id, data FROM metadata ORDER BY id ASC LIMIT 10"
-    )
+    cursor.execute("SELECT id, data FROM metadata ORDER BY id ASC LIMIT 10")
     rows = cursor.fetchall()
 
     for row_id, data in rows:
@@ -44,7 +41,9 @@ def run_search_tests(store: FaissStore):
     ]
 
     for i, q in enumerate(queries):
+        # Embed the query
         q_vec = embedder.embed([q])
+        # FAISS expects 2D array
         distances, results = store.search(q_vec, k=5)
 
         print(f"\n[QUERY {i}] {q}")
@@ -62,18 +61,24 @@ def main():
         print("Index or metadata DB not found.")
         return
 
+    # Initialize FAISS store
     store = FaissStore(
         dim=DIM,
         index_path=INDEX_PATH,
         db_path=DB_PATH,
+        max_vectors=4_500_000  # optional: enforce max vectors
     )
-    store.load()
-
+    # Load index
+    store.load(mmap=False)
     print(f"Loaded FAISS index with {store.ntotal} vectors")
 
+    # Show some metadata
     show_first_10_samples(DB_PATH)
+
+    # Run search tests
     run_search_tests(store)
 
+    # Close DB connection
     store.close()
 
 

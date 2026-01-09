@@ -1,7 +1,7 @@
 import time
+import gc
 from pathlib import Path
 from typing import Dict, Any, Iterable, Iterator, List
-import gc
 
 from Reasona.data.embedder import Embedder
 from Reasona.data.chunker import TextChunker
@@ -12,7 +12,7 @@ from Reasona.utils.logger import setup_logger
 
 class IndexingPipeline:
     """
-    Memory-optimized indexing pipeline for large datasets.
+    Memory-safe indexing pipeline with hard capacity limit.
     """
 
     def __init__(self, cfg: IndexingConfig):
@@ -40,13 +40,19 @@ class IndexingPipeline:
         self.store: FaissStore | None = None
         self.vectors_written = 0
         self.start_time = time.time()
-        self._max_reached_logged = False  # NEW
 
+    # -------------------------
+    # Public API
+    # -------------------------
     def run(self, stream: Iterable[Dict[str, Any]]):
-        chunk_stream = self._chunk_stream(stream)
-        self._index_stream(chunk_stream)
-        self._finalize()
+        try:
+            self._index_stream(self._chunk_stream(stream))
+        finally:
+            self._finalize()
 
+    # -------------------------
+    # Chunking
+    # -------------------------
     def _chunk_stream(
         self, stream: Iterable[Dict[str, Any]]
     ) -> Iterator[Dict[str, Any]]:
@@ -59,44 +65,27 @@ class IndexingPipeline:
                     "original_id": item.get("id"),
                 }
 
+    # -------------------------
+    # Indexing
+    # -------------------------
     def _index_stream(self, chunk_stream: Iterable[Dict[str, Any]]):
         batch: List[Dict[str, Any]] = []
 
         for chunk in chunk_stream:
-            if self.store and self.store.is_full:
-                if not self._max_reached_logged:
-                    self.logger.info(
-                        "Max vectors reached (%d). Skipping further indexing.",
-                        self.store.ntotal,
-                    )
-                    self._max_reached_logged = True
-                continue
-
             batch.append(chunk)
+
             if len(batch) >= self.cfg.batch_size:
-                self._process_batch(batch)
+                if not self._process_batch(batch):
+                    return
                 batch.clear()
                 gc.collect()
 
-        if batch and not (self.store and self.store.is_full):
+        if batch:
             self._process_batch(batch)
-            batch.clear()
-            gc.collect()
 
-    def _process_batch(self, batch: List[Dict[str, Any]]):
-        if self.store and self.store.is_full:
-            return
-
+    def _process_batch(self, batch: List[Dict[str, Any]]) -> bool:
         texts = [c["text"] for c in batch]
-        metas = [
-            {
-                "id": c["id"],
-                "text": c["text"],
-                "source": c.get("source"),
-                "original_id": c.get("original_id"),
-            }
-            for c in batch
-        ]
+        metas = batch
 
         vectors = self.embedder.embed(texts)
 
@@ -105,25 +94,34 @@ class IndexingPipeline:
                 dim=vectors.shape[1],
                 index_path=self.index_path,
                 db_path=self.meta_db_path,
-                max_vectors=4_500_000,  
+                max_vectors=self.cfg.max_vectors,
             )
             self.store.load()
 
-        added = self.store.add(vectors, metas)
-        self.vectors_written += added
+        written = self.store.add(vectors, metas)
+        self.vectors_written += written
 
-        del vectors, metas, texts
+        del vectors, texts, metas
         gc.collect()
 
-        if added == 0:
-            return
+        if written == 0 and self.store.is_full:
+            self.logger.warning(
+                "Vector store full (%d vectors). Indexing stopped.",
+                self.store.ntotal,
+            )
+            return False
 
-        if self.vectors_written % self.cfg.log_every < added:
+        if self.vectors_written % self.cfg.log_every < self.cfg.batch_size:
             self._log_progress()
 
-        if self.vectors_written % self.cfg.save_every < added:
+        if self.vectors_written % self.cfg.save_every < self.cfg.batch_size:
             self._checkpoint()
 
+        return True
+
+    # -------------------------
+    # Logging / Persistence
+    # -------------------------
     def _log_progress(self):
         elapsed = max(time.time() - self.start_time, 1e-6)
         rate = self.vectors_written / elapsed
@@ -135,14 +133,9 @@ class IndexingPipeline:
 
     def _checkpoint(self):
         if self.store:
-            self.store._finalize()
             self.store.save()
-            self.store._train_buffer.clear()
-            gc.collect()
-
             self.logger.info(
-                "Checkpoint saved | vectors=%d | RAM cleaned",
-                self.vectors_written,
+                "Checkpoint saved | vectors=%d", self.vectors_written
             )
 
     def _finalize(self):
@@ -150,7 +143,6 @@ class IndexingPipeline:
             self.store._finalize()
             self.store.save()
             self.store.close()
-            gc.collect()
 
         self.logger.info(
             "Indexing finished | vectors=%d | runtime=%.1fs",

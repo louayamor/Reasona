@@ -1,7 +1,6 @@
-import time
-import gc
 from pathlib import Path
-from typing import Dict, Any, Iterable, Iterator, List
+from typing import Iterable
+import numpy as np
 
 from Reasona.data.embedder import Embedder
 from Reasona.data.chunker import TextChunker
@@ -9,140 +8,84 @@ from Reasona.vectorstore.faiss_store import FaissStore
 from Reasona.config.config_manager import IndexingConfig
 from Reasona.utils.logger import setup_logger
 
+logger = setup_logger("indexing_pipeline", "logs/pipeline/indexing_pipeline.json")
+
 
 class IndexingPipeline:
     """
-    Memory-safe indexing pipeline with hard capacity limit.
+    Streaming-safe FAISS indexing pipeline.
+    Never loads FAISS index.
+    Uses metadata DB for capacity checks.
     """
 
     def __init__(self, cfg: IndexingConfig):
         self.cfg = cfg
-        self.logger = setup_logger("indexing", "logs/pipeline/indexing.json")
 
-        self.vector_dir = Path(cfg.vector_store_dir)
-        self.vector_dir.mkdir(parents=True, exist_ok=True)
-
-        self.index_path = self.vector_dir / "index.faiss"
-        self.meta_db_path = self.vector_dir / "metadata.db"
-
+        self.chunker = TextChunker(cfg.chunk_size, cfg.chunk_overlap)
         self.embedder = Embedder(
             model_name=cfg.embedding_model,
+            device=cfg.device,
             batch_size=cfg.batch_size,
-            log_every=cfg.log_every,
         )
 
-        self.chunker = TextChunker(
-            chunk_size=cfg.chunk_size,
-            overlap=cfg.chunk_overlap,
-            log_every=cfg.log_every,
+        self.store = FaissStore(
+            dim=cfg.embedding_dim,
+            index_path=Path(cfg.vector_store_dir) / "index.faiss",
+            db_path=Path(cfg.vector_store_dir) / "metadata.db",
+            max_vectors=cfg.max_vectors,
         )
 
-        self.store: FaissStore | None = None
-        self.vectors_written = 0
-        self.start_time = time.time()
+        self._stop = False
 
-    # -------------------------
-    # Public API
-    # -------------------------
-    def run(self, stream: Iterable[Dict[str, Any]]):
-        try:
-            self._index_stream(self._chunk_stream(stream))
-        finally:
-            self._finalize()
+    def run(self, stream: Iterable[dict]):
+        """
+        Stream → chunk → embed → add to FAISS
+        Stops automatically when max_vectors is reached.
+        """
 
-    # -------------------------
-    # Chunking
-    # -------------------------
-    def _chunk_stream(
-        self, stream: Iterable[Dict[str, Any]]
-    ) -> Iterator[Dict[str, Any]]:
-        for item in stream:
-            for chunk in self.chunker.chunk_item(item):
-                yield {
-                    "id": chunk["id"],
-                    "text": chunk["text"],
-                    "source": chunk.get("source"),
-                    "original_id": item.get("id"),
+        # --- Capacity guard (NO FAISS LOAD) ---
+        current_vectors = self.store.count_vectors()
+        if current_vectors >= self.cfg.max_vectors:
+            logger.warning(
+                f"Max vectors reached ({current_vectors}/{self.cfg.max_vectors}). "
+                "Indexing skipped."
+            )
+            return
+
+        logger.info(f"Starting indexing from vector #{current_vectors}")
+
+        for sample in stream:
+            if self._stop:
+                break
+
+            texts = self.chunker.chunk(sample["text"])
+            if not texts:
+                continue
+
+            embeddings = self.embedder.encode(texts)
+            if embeddings is None or len(embeddings) == 0:
+                continue
+
+            remaining = self.cfg.max_vectors - self.store.count_vectors()
+            if remaining <= 0:
+                logger.warning("Max vectors reached during stream. Stopping.")
+                break
+
+            embeddings = embeddings[:remaining]
+            texts = texts[:remaining]
+
+            metadata = [
+                {
+                    "text": text,
+                    "source": sample.get("source"),
                 }
+                for text in texts
+            ]
 
-    # -------------------------
-    # Indexing
-    # -------------------------
-    def _index_stream(self, chunk_stream: Iterable[Dict[str, Any]]):
-        batch: List[Dict[str, Any]] = []
-
-        for chunk in chunk_stream:
-            batch.append(chunk)
-
-            if len(batch) >= self.cfg.batch_size:
-                if not self._process_batch(batch):
-                    return
-                batch.clear()
-                gc.collect()
-
-        if batch:
-            self._process_batch(batch)
-
-    def _process_batch(self, batch: List[Dict[str, Any]]) -> bool:
-        texts = [c["text"] for c in batch]
-        metas = batch
-
-        vectors = self.embedder.embed(texts)
-
-        if self.store is None:
-            self.store = FaissStore(
-                dim=vectors.shape[1],
-                index_path=self.index_path,
-                db_path=self.meta_db_path,
-                max_vectors=self.cfg.max_vectors,
-            )
-            self.store.load()
-
-        written = self.store.add(vectors, metas)
-        self.vectors_written += written
-
-        del vectors, texts, metas
-        gc.collect()
-
-        if written == 0 and self.store.is_full:
-            self.logger.warning(
-                "Vector store full (%d vectors). Indexing stopped.",
-                self.store.ntotal,
-            )
-            return False
-
-        if self.vectors_written % self.cfg.log_every < self.cfg.batch_size:
-            self._log_progress()
-
-        if self.vectors_written % self.cfg.save_every < self.cfg.batch_size:
-            self._checkpoint()
-
-        return True
-
-    def _log_progress(self):
-        elapsed = max(time.time() - self.start_time, 1e-6)
-        rate = self.vectors_written / elapsed
-        self.logger.info(
-            "Indexing progress | vectors=%d | rate=%.1f vec/s",
-            self.vectors_written,
-            rate,
-        )
-
-    def _checkpoint(self):
-        if self.store:
-            self.store.save()
-            self.logger.info(
-                "Checkpoint saved | vectors=%d", self.vectors_written
+            self.store.add(
+                vectors=np.asarray(embeddings, dtype="float32"),
+                metadatas=metadata,
             )
 
-    def _finalize(self):
-        if self.store:
-            self.store._finalize()
-            self.store.save()
-            self.store.close()
-
-        self.logger.info(
-            "Indexing finished | vectors=%d | runtime=%.1fs",
-            self.vectors_written,
-            time.time() - self.start_time,
-        )
+        self.store.save()
+        logger.info("Indexing completed successfully.")

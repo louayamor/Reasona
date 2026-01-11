@@ -1,4 +1,3 @@
-# retriever.py
 from typing import List, Dict, Callable, Optional, Iterable
 import numpy as np
 from Reasona.vectorstore.faiss_store import FaissStore
@@ -6,13 +5,8 @@ from Reasona.vectorstore.faiss_store import FaissStore
 
 class Retriever:
     """
-    Handles retrieval logic given a FaissStore and query vectors.
-    - Does not manage embedding or FAISS initialization.
-    - Supports single query, batch queries, and filtering.
+    Handles retrieval logic for the disk-backed FaissStore.
     """
-
-    def __init__(self):
-        pass  
 
     def retrieve(
         self,
@@ -22,28 +16,34 @@ class Retriever:
         filter_fn: Optional[Callable[[Dict], bool]] = None,
         index: FaissStore = None,
     ) -> List[Dict]:
-        """
-        Retrieve top-k items for a single query vector.
-        `index` must be a FaissStore instance.
-        """
+
         if index is None:
             raise ValueError("FaissStore instance must be provided as 'index'.")
 
-        distances, results_meta = index.search(query_vector, k)
+        query_vector = np.atleast_2d(query_vector).astype("float32")
+
+        distances, metas = index.search(query_vector, k)
+
+        if not metas:
+            return []
+
+        distances = np.asarray(distances).flatten()
+
         output: List[Dict] = []
 
-        for rank, meta in enumerate(results_meta):
-            if not meta:
-                continue
+        for rank, meta in enumerate(metas):
             if filter_fn and not filter_fn(meta):
                 continue
 
             item = {
-                "text": str(meta.get("text") or meta.get("content") or ""),
+                "text": meta.get("text", ""),
                 "metadata": meta,
             }
+
             if return_scores:
+                # L2 distance → similarity score
                 item["score"] = float(1.0 / (1.0 + distances[rank]))
+
             output.append(item)
 
         return output
@@ -56,20 +56,14 @@ class Retriever:
         filter_fn: Optional[Callable[[Dict], bool]] = None,
         index: FaissStore = None,
     ) -> List[List[Dict]]:
-        """
-        Retrieve top-k items for multiple query vectors.
-        """
-        if index is None:
-            raise ValueError("FaissStore instance must be provided as 'index'.")
 
-        results = [
+        return [
             self.retrieve(
                 vec,
                 k=k,
                 return_scores=return_scores,
                 filter_fn=filter_fn,
-                index=index
+                index=index,
             )
             for vec in query_vectors
         ]
-        return results

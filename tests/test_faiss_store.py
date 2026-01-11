@@ -6,32 +6,33 @@ import numpy as np
 from Reasona.vectorstore.faiss_store import FaissStore
 from Reasona.data.embedder import Embedder
 
-INDEX_PATH = Path("../artifacts/vectors/index.faiss")
-DB_PATH = Path("../artifacts/vectors/metadata.db")
-DIM = 384  # all-MiniLM-L6-v2
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+INDEX_PATH = PROJECT_ROOT / "artifacts/vectors/index.faiss"
+DB_PATH = PROJECT_ROOT / "artifacts/vectors/metadata.db"
+
+DIM = 384
 
 
 def show_first_10_samples(db_path: Path):
     print("\n=== FIRST 10 STORED SAMPLES ===")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    with sqlite3.connect(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT id, data FROM metadata ORDER BY id ASC LIMIT 10")
 
-    cursor.execute("SELECT id, data FROM metadata ORDER BY id ASC LIMIT 10")
-    rows = cursor.fetchall()
-
-    for row_id, data in rows:
-        meta = json.loads(data)
-        text = meta.get("text", "<no text>")[:300]
-        print(f"[{row_id}] {text}")
-        print("-" * 60)
-
-    conn.close()
+        for row_id, data in cur.fetchall():
+            meta = json.loads(data)
+            text = meta.get("text", "<no text>")[:300]
+            print(f"[{row_id}] {text}")
+            print("-" * 60)
 
 
 def run_search_tests(store: FaissStore):
     embedder = Embedder(
         model_name="sentence-transformers/all-MiniLM-L6-v2",
-        device="cuda"
+        device="cuda",
+        batch_size=16,
+        log_every=0,
     )
 
     queries = [
@@ -40,13 +41,12 @@ def run_search_tests(store: FaissStore):
         "small village in Iran",
     ]
 
-    for i, q in enumerate(queries):
-        # Embed the query
-        q_vec = embedder.embed([q])
-        # FAISS expects 2D array
+    for i, query in enumerate(queries):
+        q_vec = embedder.embed([query]).astype("float32")
+
         distances, results = store.search(q_vec, k=5)
 
-        print(f"\n[QUERY {i}] {q}")
+        print(f"\n[QUERY {i}] {query}")
         if not results:
             print("  No results found.")
             continue
@@ -61,24 +61,21 @@ def main():
         print("Index or metadata DB not found.")
         return
 
-    # Initialize FAISS store
     store = FaissStore(
         dim=DIM,
         index_path=INDEX_PATH,
         db_path=DB_PATH,
-        max_vectors=4_500_000  # optional: enforce max vectors
+        max_vectors=3_100_000,
     )
-    # Load index
-    store.load(mmap=False)
-    print(f"Loaded FAISS index with {store.ntotal} vectors")
 
-    # Show some metadata
+    # 🔹 mmap-enabled load (RETRIEVAL ONLY)
+    store.load(mmap=True)
+
+    print(f"Loaded FAISS index with {store.ntotal} vectors (mmap enabled)")
+
     show_first_10_samples(DB_PATH)
-
-    # Run search tests
     run_search_tests(store)
 
-    # Close DB connection
     store.close()
 
 

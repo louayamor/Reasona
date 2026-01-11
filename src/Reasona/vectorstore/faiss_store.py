@@ -1,20 +1,23 @@
 from pathlib import Path
 from typing import List, Dict, Optional
-import numpy as np
-import faiss
 import sqlite3
 import json
+import numpy as np
+import faiss
 
 
 class FaissStore:
     """
-    Disk-backed FAISS store with SQLite metadata storage.
-    Safe for multi-million scale IVF indexing.
+    Disk-backed FAISS IVF store with SQLite metadata.
+    - Lazy index creation (dim can be None at init)
+    - Supports mmap loading
+    - Automatic retraining if needed
+    - Max vectors enforcement
     """
 
     def __init__(
         self,
-        dim: int,
+        dim: Optional[int],
         index_path: Path,
         db_path: Path,
         nlist: int = 1024,
@@ -32,21 +35,12 @@ class FaissStore:
         self.train_threshold = max(train_threshold, nlist)
         self.max_vectors = max_vectors
 
-        quantizer = faiss.IndexFlatL2(dim)
-        if pq:
-            self.index = faiss.IndexIVFPQ(quantizer, dim, nlist, pq, 8)
-        else:
-            self.index = faiss.IndexIVFFlat(quantizer, dim, nlist, faiss.METRIC_L2)
-
-        self.index.nprobe = nprobe
         self.is_trained = False
-
-        # buffers 
         self._train_vectors: List[np.ndarray] = []
         self._pending_vectors: List[np.ndarray] = []
 
-        # sqlite
-        self.conn = sqlite3.connect(self.db_path)
+        # SQLite metadata
+        self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
         self.cursor.execute(
             """
@@ -58,16 +52,45 @@ class FaissStore:
         )
         self.conn.commit()
 
+        # FAISS index: lazy creation if dim is unknown
+        self.index: Optional[faiss.Index] = None
+        if dim is not None:
+            self._create_index(dim)
+
+    # -------------------------
+    # Index creation
+    # -------------------------
+    def _create_index(self, dim: int):
+        quantizer = faiss.IndexFlatL2(dim)
+        if self.pq:
+            self.index = faiss.IndexIVFPQ(quantizer, dim, self.nlist, self.pq, 8)
+        else:
+            self.index = faiss.IndexIVFFlat(quantizer, dim, self.nlist, faiss.METRIC_L2)
+        self.index.nprobe = self.nprobe
+        self.dim = dim
+
+    # -------------------------
+    # Properties
+    # -------------------------
     @property
     def ntotal(self) -> int:
-        return self.index.ntotal
+        return self.index.ntotal if self.index else 0
 
     @property
     def is_full(self) -> bool:
         return self.max_vectors is not None and self.ntotal >= self.max_vectors
 
+    # -------------------------
+    # Count vectors (for safe indexing/resume)
+    # -------------------------
+    def count_vectors(self) -> int:
+        return self.ntotal
+
+    # -------------------------
+    # Add vectors and metadata
+    # -------------------------
     def add(self, vectors: np.ndarray, metas: List[Dict]) -> int:
-        if self.is_full:
+        if self.is_full or vectors.size == 0:
             return 0
 
         vectors = vectors.astype("float32")
@@ -79,13 +102,18 @@ class FaissStore:
             vectors = vectors[:remaining]
             metas = metas[:remaining]
 
-        metas_json = [(json.dumps(m),) for m in metas]
+        # Store metadata first
         self.cursor.executemany(
             "INSERT INTO metadata (data) VALUES (?)",
-            metas_json,
+            [(json.dumps(m),) for m in metas],
         )
         self.conn.commit()
 
+        # Initialize index if first batch
+        if self.index is None:
+            self._create_index(vectors.shape[1])
+
+        # Train or add
         if not self.is_trained:
             self._train_vectors.append(vectors)
             self._pending_vectors.append(vectors)
@@ -95,7 +123,9 @@ class FaissStore:
         self.index.add(vectors)
         return len(vectors)
 
-    
+    # -------------------------
+    # Training
+    # -------------------------
     def _train_once(self):
         if self.is_trained:
             return
@@ -114,9 +144,12 @@ class FaissStore:
         self._pending_vectors.clear()
         self.is_trained = True
 
+    # -------------------------
+    # Search
+    # -------------------------
     def search(self, query: np.ndarray, k: int = 5):
         if not self.is_trained or self.ntotal == 0:
-            return [], []
+            return np.array([]), []
 
         query = query.astype("float32")
         distances, indices = self.index.search(query, k)
@@ -125,35 +158,36 @@ class FaissStore:
         for idx in indices[0]:
             if idx == -1:
                 continue
-            self.cursor.execute(
-                "SELECT data FROM metadata WHERE id=?",
-                (idx + 1,),
-            )
+            self.cursor.execute("SELECT data FROM metadata WHERE id=?", (idx + 1,))
             row = self.cursor.fetchone()
             if row:
                 results.append(json.loads(row[0]))
 
         return distances[0], results
 
+    # -------------------------
+    # Persistence
+    # -------------------------
     def save(self):
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        faiss.write_index(self.index, str(self.index_path))
+        if self.index:
+            faiss.write_index(self.index, str(self.index_path))
         self.conn.commit()
 
-    def load(self):
-        if self.index_path.exists():
+    def load(self, mmap: bool = False):
+        if not self.index_path.exists():
+            return
 
+        if mmap:
+            self.index = faiss.read_index(str(self.index_path), faiss.IO_FLAG_MMAP)
+        else:
             self.index = faiss.read_index(str(self.index_path))
-            self.index.nprobe = self.nprobe
-            self.index.is_trained = self.is_trained
+        self.index.nprobe = self.nprobe
+        self.is_trained = self.index.is_trained
 
-    def _finalize(self):
-        """
-        Call once at the very end.
-        """
+    def finalize(self):
         if not self.is_trained and self._pending_vectors:
             self._train_once()
-
         self.save()
 
     def close(self):

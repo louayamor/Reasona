@@ -6,7 +6,8 @@ from Reasona.entities.config_entity import (
     TrainingConfig,
     IndexingConfig,
     InferenceConfig,
-    RetrievalConfig
+    RetrievalConfig,
+    RerankingConfig,
 )
 from Reasona.config.validators import require
 
@@ -56,6 +57,8 @@ class ConfigurationManager:
             log_every=int(cfg.get("log_every")),
             save_every=int(cfg.get("save_every")),
             max_vectors=int(cfg.get("max_vectors")) if cfg.get("max_vectors") is not None else None,
+            device=cfg.get("device", "cuda"),
+            embedding_dim=int(cfg.get("embedding_dim", 384)),
         )
         
     def get_retrieval_config(self) -> RetrievalConfig:
@@ -71,19 +74,12 @@ class ConfigurationManager:
             embedding_dim=int(require(cfg, "embedding_dim", "retrieval")),
             use_cache=bool(cfg.get("use_cache", True)),
             max_workers=int(cfg.get("max_workers", 4)),
+            debug=bool(cfg.get("debug", True)),
+            batch_size=int(cfg.get("batch_size")),
+            log_every=int(cfg.get("log_every")),
+            device=cfg.get("device", "cuda"),
+            nprobe=int(cfg.get("nprobe")),
         )
-
-    def get_training_config(self) -> TrainingConfig:
-        cfg = self.config.get("training")
-        if not cfg:
-            raise ValueError("Missing 'training' section in config.yaml")
-
-        return TrainingConfig(
-            dataset_path=Path(require(cfg, "dataset_path", "training")),
-            output_dir=Path(require(cfg, "output_dir", "training")),
-            base_model=require(cfg, "base_model", "training"),
-        )
-
     
     def get_inference_config(self) -> InferenceConfig:
         cfg = self.config.get("inference")
@@ -98,4 +94,14 @@ class ConfigurationManager:
             engine=cfg.get("engine", "transformer"),
             max_tokens=int(cfg.get("max_tokens", 512)),
             temperature=float(cfg.get("temperature", 0.7)),
+        )
+
+
+    def get_reranking_config(self) -> RerankingConfig:
+        cfg = self.config.get("reranker", {})
+        return RerankingConfig(
+            enabled=bool(cfg.get("enabled", False)),
+            model=cfg.get("model", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
+            top_k=int(cfg.get("top_k", 10)),
+            batch_size=int(cfg.get("batch_size", 16)),
         )

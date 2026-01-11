@@ -1,51 +1,75 @@
-# retrieval_pipeline.py
 from pathlib import Path
-from typing import List, Dict, Callable, Optional, Iterable
-from concurrent.futures import ThreadPoolExecutor
+from typing import List, Dict, Callable, Optional, Tuple
 import numpy as np
+import faiss
 
 from Reasona.data.embedder import Embedder
 from Reasona.entities.config_entity import RetrievalConfig
-from Reasona.vectorstore.retriever import Retriever
 from Reasona.vectorstore.faiss_store import FaissStore
+from Reasona.inference.retriever import Retriever
 from Reasona.utils.logger import setup_logger
 
-logger = setup_logger("retrieval_pipeline", "logs/pipeline/retrieval_pipeline.json")
+
+faiss.omp_set_num_threads(1)
+
+logger = setup_logger(
+    "retrieval_pipeline",
+    "logs/pipeline/retrieval_pipeline.json",
+)
 
 
 class RetrievalPipeline:
     """
-    Orchestrates:
-    - Loading FAISS store
-    - Embedding queries
-    - Using Retriever for scoring/filtering
-    - Batch and parallel batch queries
-    - RAG-ready output
+    Retrieval pipeline using:
+    - GPU embeddings
+    - FAISS IVF mmap index
+    - SQLite-backed metadata
     """
 
     def __init__(self, cfg: RetrievalConfig):
         self.cfg = cfg
+        self.debug = cfg.debug
         self.vector_store_dir: Path = cfg.vector_store_dir
-        self.max_workers: int = getattr(cfg, "max_workers", 4)
-        self.use_cache: bool = getattr(cfg, "use_cache", True)
 
         index_path = self.vector_store_dir / "index.faiss"
         db_path = self.vector_store_dir / "metadata.db"
 
-        self.embedder = Embedder(cfg.embedding_model)
-        embedding_dim = getattr(cfg, "embedding_dim", None)
-        if embedding_dim is None:
-            dummy_vec = self.embedder.embed(["test"])
-            embedding_dim = dummy_vec.shape[1]
-            logger.info(f"Inferred embedding dimension: {embedding_dim}")
+        self.embedder = Embedder(
+            model_name=cfg.embedding_model,
+            batch_size=1,              
+            device="cuda",
+            log_every=cfg.log_every,
+        )
 
-        self.store = FaissStore(dim=embedding_dim, index_path=index_path, db_path=db_path)
-        self.store.load()
-        logger.info(f"Loaded FAISS store with {self.store.ntotal} vectors")
+        dummy = self.embedder.embed(["_dim_check_"])
+        embedding_dim = dummy.shape[1]
+
+        self.store = FaissStore(
+            dim=embedding_dim,
+            index_path=index_path,
+            db_path=db_path,
+            nprobe=cfg.nprobe,
+        )
+        self.store.load(mmap=True)
+
+        logger.info(
+            "FAISS state | trained=%s | ntotal=%d | nprobe=%d",
+            self.store.index.is_trained,
+            self.store.index.ntotal,
+            self.store.index.nprobe,
+        )
+
+        logger.info(
+            "FAISS store loaded | vectors=%d",
+            self.store.ntotal,
+        )
 
         self.retriever = Retriever()
 
-        self._cache: Dict[str, List[Dict]] = {}
+        self._cache: Dict[
+            Tuple[str, int, bool, int],
+            List[Dict],
+        ] = {}
 
     def query(
         self,
@@ -53,16 +77,21 @@ class RetrievalPipeline:
         top_k: Optional[int] = None,
         return_scores: bool = True,
         filter_fn: Optional[Callable[[Dict], bool]] = None,
-        use_cache: Optional[bool] = None,
     ) -> List[Dict]:
+
         top_k = top_k or self.cfg.top_k
-        use_cache = self.use_cache if use_cache is None else use_cache
 
-        if use_cache and query_text in self._cache:
-            logger.info("Cache hit for query")
-            return self._cache[query_text]
+        cache_key = (
+            query_text,
+            top_k,
+            return_scores,
+            id(filter_fn),
+        )
 
-        query_vector = self.embedder.embed([query_text])[0]
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        query_vector = self.embedder.embed([query_text]).astype("float32")
 
         results = self.retriever.retrieve(
             query_vector=query_vector,
@@ -72,60 +101,54 @@ class RetrievalPipeline:
             index=self.store
         )
 
-        if use_cache:
-            self._cache[query_text] = results
-
+        self._cache[cache_key] = results
         return results
 
-    def query_batch(
-        self,
-        queries: Iterable[str],
-        top_k: Optional[int] = None,
-        return_scores: bool = True,
-        filter_fn: Optional[Callable[[Dict], bool]] = None,
-        use_cache: Optional[bool] = None,
-    ) -> List[List[Dict]]:
-        use_cache = self.use_cache if use_cache is None else use_cache
-        query_list = list(queries)
-        query_vectors = [self.embedder.embed([q])[0] for q in query_list]
-
-        results = self.retriever.retrieve_batch(
-            query_vectors=query_vectors,
-            k=top_k or self.cfg.top_k,
-            return_scores=return_scores,
-            filter_fn=filter_fn,
-            index=self.store
-        )
-        return results
-
-    def query_batch_parallel(
-        self,
-        queries: Iterable[str],
-        top_k: Optional[int] = None,
-        return_scores: bool = True,
-        filter_fn: Optional[Callable[[Dict], bool]] = None,
-        use_cache: Optional[bool] = None,
-    ) -> List[List[Dict]]:
-        queries = list(queries)
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            results = list(
-                executor.map(
-                    lambda q: self.query(q, top_k, return_scores, filter_fn, use_cache),
-                    queries
-                )
-            )
-        return results
-    
-    def run(
+    def run_query(
         self,
         query_text: str,
         top_k: Optional[int] = None,
-        filter_fn: Optional[Callable[[Dict], bool]] = None,
     ) -> Dict:
-        chunks = self.query(query_text, top_k=top_k, filter_fn=filter_fn)
-        prompt_input = "\n\n".join([c["text"] for c in chunks])
-        return {"query": query_text, "chunks": chunks, "prompt_input": prompt_input}
+
+        chunks = self.query(query_text, top_k=top_k)
+        prompt_input = "\n\n".join(c["text"] for c in chunks)
+
+        return {
+            "query": query_text,
+            "chunks": chunks,
+            "prompt_input": prompt_input,
+        }
+
+    def run(self):
+        print("Retrieval pipeline ready. Type a query (or 'exit').")
+
+        while True:
+            try:
+                query_text = input(">> ").strip()
+                if query_text.lower() in {"exit", "quit"}:
+                    break
+                if not query_text:
+                    continue
+
+                result = self.run_query(
+                    query_text,
+                    top_k=self.cfg.top_k,
+                )
+
+                chunks = result["chunks"]
+                print(f"Retrieved {len(chunks)} chunks")
+
+                if self.debug and chunks:
+                    top = chunks[0]
+                    print(f"Top score : {top.get('score')}")
+                    print(f"Preview   : {top['text'][:200]}...")
+
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                logger.exception("Retrieval error")
+                print(f"Error: {e}")
 
     @staticmethod
     def filter_by_source(source: str) -> Callable[[Dict], bool]:
-        return lambda chunk: chunk.get("source") == source
+        return lambda meta: meta.get("source") == source

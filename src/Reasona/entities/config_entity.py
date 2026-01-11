@@ -10,13 +10,7 @@ class PreprocessConfig:
     cache_dir: Optional[Path] = None     
     shuffle_buffer: int = 0              
     max_samples: Optional[int] = None    
-    schema_path: Optional[Path] = None   
-
-@dataclass(frozen=True)
-class TrainingConfig:
-    dataset_path: Path                     
-    output_dir: Path                       
-    base_model: str                        
+    schema_path: Optional[Path] = None                       
 
 @dataclass
 class IndexingConfig:
@@ -28,18 +22,24 @@ class IndexingConfig:
     queue_size: int
     log_every: Optional[int]    
     save_every: Optional[int]
-    max_vectors: Optional[int] = None
+    max_vectors: Optional[int] 
+    device: str 
+    embedding_dim: int
 
 @dataclass(frozen=True)
 class RetrievalConfig:
-    vector_store_dir: Path                
-    top_k: int                        
-    embedding_model: str 
-    engine: str     
+    vector_store_dir: Path
+    top_k: int
+    embedding_model: str
+    engine: str
     embedding_dim: int
-    use_cache: bool = True
-    max_workers: int = 4    
-
+    use_cache: bool
+    max_workers: int
+    debug: bool
+    batch_size: int
+    log_every: Optional[int]
+    device: str 
+    nprobe: int 
 
 @dataclass(frozen=True)
 class InferenceConfig:
@@ -48,3 +48,10 @@ class InferenceConfig:
     engine: str = "transformer"            
     max_tokens: int = 256
     temperature: float = 0.7
+
+@dataclass(frozen=True)
+class RerankingConfig:
+    enabled: bool = False
+    model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    top_k: int = 10
+    batch_size: int = 16

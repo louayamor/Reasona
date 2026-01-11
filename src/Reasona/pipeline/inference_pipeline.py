@@ -1,44 +1,66 @@
-from typing import List, Dict
-from Reasona.utils.logger import setup_logger
-from Reasona.pipeline.retrieval_pipeline import RetrievalPipeline
-from Reasona.entities.config_entity import InferenceConfig
+# Reasona/pipeline/inference_pipeline.py
 
-logger = setup_logger("inference_pipeline", "logs/pipeline/inference_pipeline.json")
+from typing import Dict
+from Reasona.pipeline.reranking_pipeline import RerankingPipeline
+from Reasona.inference.generator import Generator
+from Reasona.config.config_manager import ConfigurationManager
+from Reasona.utils.logger import setup_logger
+
+
+logger = setup_logger(
+    "inference_pipeline",
+    "logs/pipeline/inference_pipeline.json",
+)
 
 
 class InferencePipeline:
     """
-    Inference pipeline using RetrievalPipeline to provide context for prompts.
+    End-to-end inference:
+    Query → Retrieval → Reranking → Generation
     """
 
-    def __init__(self, retrieval_pipeline: RetrievalPipeline, cfg: InferenceConfig, model=None):
-        self.retrieval = retrieval_pipeline
-        self.cfg = cfg
-        self.model = model
+    def __init__(
+        self,
+        reranking_pipeline: RerankingPipeline,
+        cfg_manager: ConfigurationManager,
+    ):
+        self.reranking_pipeline = reranking_pipeline
 
-    def generate_prompt(self, user_prompt: str, top_k_contexts: List[Dict]) -> str:
+        cfg = cfg_manager.get_inference_config()
+
+        self.generator = Generator(cfg.generator)
+        self.prompt_template = self._load_prompt(
+            cfg.prompt.template_path
+        )
+
+        logger.info(
+            "Inference initialized engine=%s model=%s",
+            cfg.engine,
+            cfg.generator.model,
+        )
+
+    def run_query(self, query_text: str) -> Dict:
         """
-        Build a prompt by combining retrieved context chunks with the user prompt.
+        Final user-facing inference call
         """
-        context_text = "\n\n".join([c.get("text", "") for c in top_k_contexts])
-        full_prompt = f"Context:\n{context_text}\n\nQuestion:\n{user_prompt}"
-        return full_prompt
 
-    def run(self, user_prompt: str, top_k: int = 5) -> str:
-        """
-        Run retrieval + model inference.
-        Returns the generated answer.
-        """
-        logger.info(f"Running inference for prompt: {user_prompt[:50]}...")
+        reranked = self.reranking_pipeline.run_query(query_text)
 
-        retrieved_chunks = self.retrieval.query(user_prompt, top_k=top_k)
+        prompt = self.prompt_template.format(
+            context=reranked["prompt_input"],
+            question=query_text,
+        )
 
-        final_prompt = self.generate_prompt(user_prompt, retrieved_chunks)
+        answer = self.generator.generate(prompt)
 
-        if self.model is None:
-            logger.warning("No model provided. Returning prompt only.")
-            return final_prompt
+        return {
+            "query": query_text,
+            "answer": answer,
+            "chunks": reranked["chunks"],
+            "prompt": prompt,
+        }
 
-        output = self.model(final_prompt)
-        logger.info("Inference completed.")
-        return output
+    @staticmethod
+    def _load_prompt(path: str) -> str:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()

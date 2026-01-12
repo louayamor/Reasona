@@ -1,11 +1,8 @@
-# Reasona/pipeline/reranking_pipeline.py
-
 from typing import Dict, Optional
 from Reasona.pipeline.retrieval_pipeline import RetrievalPipeline
 from Reasona.config.config_manager import ConfigurationManager
 from Reasona.inference.reranker import Reranker
 from Reasona.utils.logger import setup_logger
-
 
 logger = setup_logger(
     "reranking_pipeline",
@@ -15,15 +12,11 @@ logger = setup_logger(
 
 class RerankingPipeline:
     """
-    Middle-ground pipeline:
-    Retrieval → (optional) Reranking → Inference-ready output
+    Middle-layer pipeline:
+    RetrievalPipeline → optional reranking
     """
 
-    def __init__(
-        self,
-        retrieval_pipeline: RetrievalPipeline,
-        cfg_manager: ConfigurationManager,
-    ):
+    def __init__(self, retrieval_pipeline: RetrievalPipeline, cfg_manager: ConfigurationManager):
         self.retrieval_pipeline = retrieval_pipeline
 
         cfg = cfg_manager.get_reranking_config()
@@ -43,15 +36,10 @@ class RerankingPipeline:
             cfg.model if self.enabled else "none",
         )
 
-    def run_query(
-        self,
-        query_text: str,
-        retrieval_top_k: Optional[int] = None,
-    ) -> Dict:
+    def run_query(self, query_text: str, retrieval_top_k: Optional[int] = None) -> Dict:
         """
-        Final retrieval + reranking entrypoint
+        Retrieve candidates from RetrievalPipeline and rerank them if enabled.
         """
-
         retrieval_result = self.retrieval_pipeline.run_query(
             query_text,
             top_k=retrieval_top_k,
@@ -73,3 +61,5 @@ class RerankingPipeline:
             "chunks": chunks,
             "prompt_input": prompt_input,
         }
+    
+    

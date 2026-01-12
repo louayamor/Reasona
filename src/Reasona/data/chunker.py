@@ -27,9 +27,10 @@ class TextChunker:
             end = start + self.chunk_size
 
             yield {
-                "id": str(uuid4()),               
-                "text": " ".join(words[start:end]),
-                "source": item.get("source"),
+                "id": str(uuid4()),
+                "text": " ".join(words[start:end]),             
+                "source": item.get("url"),                 
+                "title": item.get("title"), 
                 "original_id": item.get("id"),
             }
 
@@ -41,6 +42,7 @@ class TextChunker:
                     "Chunking progress | total_chunks=%d",
                     self._chunks_processed,
                 )
+
 
     def chunk_stream(self, items: Iterable[Dict]) -> Iterator[Dict]:
         for item in items:

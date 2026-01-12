@@ -1,14 +1,14 @@
 from pathlib import Path
 from typing import List, Dict, Callable, Optional, Tuple
-import numpy as np
+
 import faiss
+import numpy as np
 
 from Reasona.data.embedder import Embedder
 from Reasona.entities.config_entity import RetrievalConfig
 from Reasona.vectorstore.faiss_store import FaissStore
 from Reasona.inference.retriever import Retriever
 from Reasona.utils.logger import setup_logger
-
 
 faiss.omp_set_num_threads(1)
 
@@ -22,46 +22,46 @@ class RetrievalPipeline:
     """
     Retrieval pipeline using:
     - GPU embeddings
-    - FAISS IVF mmap index
+    - FAISS mmap index
     - SQLite-backed metadata
     """
 
     def __init__(self, cfg: RetrievalConfig):
         self.cfg = cfg
         self.debug = cfg.debug
-        self.vector_store_dir: Path = cfg.vector_store_dir
 
-        index_path = self.vector_store_dir / "index.faiss"
-        db_path = self.vector_store_dir / "metadata.db"
+        self.vector_store_dir: Path = Path(cfg.vector_store_dir)
+        self.index_path = self.vector_store_dir / "index.faiss"
+        self.db_path = self.vector_store_dir / "metadata.db"
+
+        if not self.index_path.exists() or not self.db_path.exists():
+            raise FileNotFoundError(
+                "FAISS index or metadata DB not found. "
+                "Run indexing before retrieval."
+            )
 
         self.embedder = Embedder(
             model_name=cfg.embedding_model,
-            batch_size=1,              
+            batch_size=1,
             device="cuda",
             log_every=cfg.log_every,
         )
 
-        dummy = self.embedder.embed(["_dim_check_"])
-        embedding_dim = dummy.shape[1]
-
         self.store = FaissStore(
-            dim=embedding_dim,
-            index_path=index_path,
-            db_path=db_path,
+            dim=None,                    
+            index_path=self.index_path,
+            db_path=self.db_path,
             nprobe=cfg.nprobe,
+            mmap=getattr(cfg, "mmap", True),
         )
-        self.store.load(mmap=True)
+        self.store.load()
 
         logger.info(
-            "FAISS state | trained=%s | ntotal=%d | nprobe=%d",
+            "FAISS loaded | trained=%s | ntotal=%d | nprobe=%d | mmap=%s",
             self.store.index.is_trained,
-            self.store.index.ntotal,
+            self.store.count_vectors(),
             self.store.index.nprobe,
-        )
-
-        logger.info(
-            "FAISS store loaded | vectors=%d",
-            self.store.ntotal,
+            self.store.mmap,
         )
 
         self.retriever = Retriever()
@@ -98,7 +98,7 @@ class RetrievalPipeline:
             k=top_k,
             return_scores=return_scores,
             filter_fn=filter_fn,
-            index=self.store
+            index=self.store,
         )
 
         self._cache[cache_key] = results
@@ -138,16 +138,18 @@ class RetrievalPipeline:
                 chunks = result["chunks"]
                 print(f"Retrieved {len(chunks)} chunks")
 
-                if self.debug and chunks:
-                    top = chunks[0]
-                    print(f"Top score : {top.get('score')}")
-                    print(f"Preview   : {top['text'][:200]}...")
+                for i, chunk in enumerate(chunks):
+                    score = chunk.get("score", None)
+                    source = chunk.get("source", "unknown")
+                    text_preview = chunk.get("text", "")[:200].replace("\n", " ")
+                    print(f"[{i}] score={score:.4f} | source={source} | text={text_preview}...")
 
             except KeyboardInterrupt:
                 break
             except Exception as e:
                 logger.exception("Retrieval error")
                 print(f"Error: {e}")
+
 
     @staticmethod
     def filter_by_source(source: str) -> Callable[[Dict], bool]:

@@ -12,10 +12,13 @@ venv/
 env/
 ENV/
 
+# Artifacts
 /artifacts/*
 
+# Research folder
 research/
 
+# CLI script
 cli.py
 
 # Notebook checkpoints
@@ -25,15 +28,14 @@ cli.py
 logs/
 *.log
 
-# DVC internal
-.dvc/cache/
-.dvc/tmp/
+# DVC internal 
+/.dvc
 
 # Data cache
 data_cache/
 
 # IDE/editor
-.vscode/*
+.vscode/
 .idea/
 
 # OS files
@@ -43,3 +45,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.swp
+
+tests/

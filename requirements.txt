@@ -19,4 +19,4 @@ sentence-transformers
 faiss-cpu
 accelerate
 bitsandbytes
-# mlflow<3
+mlflow<3

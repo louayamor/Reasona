@@ -25,18 +25,12 @@ class IndexingPipeline:
             "logs/pipeline/indexing.json",
         )
 
-        # -----------------------------
-        # Paths
-        # -----------------------------
         self.vector_dir = Path(cfg.vector_store_dir)
         self.vector_dir.mkdir(parents=True, exist_ok=True)
 
         self.index_path = self.vector_dir / "index.faiss"
         self.db_path = self.vector_dir / "metadata.db"
 
-        # -----------------------------
-        # Components
-        # -----------------------------
         self.embedder = Embedder(
             model_name=cfg.embedding_model,
             batch_size=cfg.batch_size,
@@ -56,7 +50,7 @@ class IndexingPipeline:
             db_path=self.db_path,
             max_vectors=cfg.max_vectors,
             nprobe=getattr(cfg, "nprobe", 16),
-            mmap=True,
+            mmap=False,
         )
 
         self.store.load()
@@ -70,9 +64,6 @@ class IndexingPipeline:
             cfg.max_vectors,
         )
 
-    # ------------------------------------------------------------------
-    # Public
-    # ------------------------------------------------------------------
     def run(self, stream: Iterable[Dict[str, Any]]):
         if self.store.is_full:
             self.logger.warning(
@@ -106,9 +97,6 @@ class IndexingPipeline:
 
         self._finalize()
 
-    # ------------------------------------------------------------------
-    # Batch processing
-    # ------------------------------------------------------------------
     def _process_batch(self, batch: List[Dict[str, Any]]):
         texts = [c["text"] for c in batch]
 
@@ -136,9 +124,6 @@ class IndexingPipeline:
         if self.vectors_written % self.cfg.save_every < self.cfg.batch_size:
             self._checkpoint()
 
-    # ------------------------------------------------------------------
-    # Logging / Persistence
-    # ------------------------------------------------------------------
     def _log_progress(self):
         elapsed = max(time.time() - self.start_time, 1e-6)
         rate = self.vectors_written / elapsed

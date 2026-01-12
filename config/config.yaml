@@ -2,30 +2,46 @@ artifacts_root: artifacts
 
 preprocess:
   dataset_name: wikimedia/wikipedia
-  dataset_config: 20231101.en  
+  dataset_config: 20231101.en
   split: train
   max_samples: 3000000
   cache_dir: artifacts/hf_cache
-  shuffle_buffer: 2048
-  prefetch_buffer: 256
+  shuffle_buffer: 4096
+  prefetch_buffer: 1024
   schema_path: config/schema.yaml
-
 
 indexing:
   vector_store_dir: artifacts/vectors
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
-  chunk_size: 512 # using bigger chunk to reduce overhead, fits my gpu memory
-  chunk_overlap: 32 # overlapping chunks to improve retrieval accuracy
-  batch_size: 16 # depending on my gpu usage (rtx 2050 )
-  queue_size: 16
-  max_vectors: 4500000
-  log_every: 50000
-  save_every: 50000
+  chunk_size: 512
+  chunk_overlap: 32
+  batch_size: 32
+  queue_size: 32
+  max_vectors: 3100000
+  log_every: 100000
+  save_every: 100000
+  device: cuda
+  embedding_dim: 384
 
-training:
-  dataset_path: artifacts/dataset
-  output_dir: artifacts/models
-  base_model: sentence-transformers/all-MiniLM-L6-v2
+retrieval:
+  vector_store_dir: artifacts/vectors
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  embedding_dim: 384
+  top_k: 5
+  engine: vector_search
+  max_workers: 8
+  use_cache: true
+  debug: true
+  batch_size: 16
+  log_every: 500
+  device: cuda
+  nprobe: 256
+
+reranker:
+  enabled: true
+  model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_k: 10
+  batch_size: 16
 
 inference:
   engine: rag
@@ -33,19 +49,15 @@ inference:
   vector_store_dir: artifacts/vectors
   generator:
     provider: hf
-    model: mistralai/Mistral-7B-Instruct-v0.2
+    model: "Qwen/Qwen2.5-1.5B-Instruct"
     max_tokens: 256
     temperature: 0.7
+    top_p: 0.95
+    repetition_penalty: 1.05
+    load_in_4bit: true
+    device_map: "auto"
+    compute_dtype: float16
   prompt:
     template_path: config/prompts/rag_prompt.txt
-
-retrieval:
-  vector_store_dir: artifacts/vectors
-  embedding_model: sentence-transformers/all-MiniLM-L6-v2
-  embedding_dim: 384       
-  top_k: 5
-  engine: vector_search
-  max_workers: 4            
-  use_cache: true           
 
 

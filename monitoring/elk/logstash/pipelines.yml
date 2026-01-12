@@ -1,2 +1,7 @@
-- pipeline.id: reasona-pipeline
+- pipeline.id: reasona-pipeline       
   path.config: "/usr/share/logstash/pipeline/logstash.conf"
+  pipeline.workers: 2                 
+  pipeline.batch.size: 125            
+  pipeline.batch.delay: 5             
+  queue.type: persisted               
+  queue.max_bytes: 1gb                

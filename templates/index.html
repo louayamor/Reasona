@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reasona</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}" />
+
+  <!-- Axios for API calls -->
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+    <section class="sidebar" id="sidebar">
+      <div class="sidebar-header" id="newChatBtn">
+        <span>+</span>
+        <button>New Chat</button>
+      </div>
+
+      <div class="sidebar-history" id="chatHistory">
+        <!-- Chat history will be injected here -->
+      </div>
+
+      <div class="sidebar-info">
+        <div class="sidebar-info-upgrade">
+          <span>User Icon</span>
+          <p>Upgrade plan</p>
+        </div>
+        <div class="sidebar-info-user">
+          <span>User Icon</span>
+          <p>User</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main content -->
+    <section class="main">
+      <div id="emptyChat" class="empty-chat-container">
+        <img src="{{ url_for('static', filename='assets/images/chatgpt-logo.svg') }}" width="45" height="45" alt="Reasona" />
+        <h1>Reasona</h1>
+        <h3>How can I help you today?</h3>
+      </div>
+
+      <div class="main-header" id="chatMessages">
+      </div>
+
+      <div class="main-bottom">
+        <p id="errorText" class="errorText"></p>
+        <p id="errorTextHint"></p>
+        <form id="chatForm" class="form-container">
+          <input type="text" id="userInput" placeholder="Send a message." autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+        <p>Reasona can make mistakes. Consider checking important information.</p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const chatForm = document.getElementById('chatForm');
+    const userInput = document.getElementById('userInput');
+    const chatMessages = document.getElementById('chatMessages');
+    const emptyChat = document.getElementById('emptyChat');
+    const errorText = document.getElementById('errorText');
+    const errorTextHint = document.getElementById('errorTextHint');
+    const chatHistory = document.getElementById('chatHistory');
+    const newChatBtn = document.getElementById('newChatBtn');
+
+    let currentTitle = null;
+    let previousChats = JSON.parse(localStorage.getItem('previousChats') || '[]');
+
+    function renderChats() {
+      chatMessages.innerHTML = '';
+      if (!currentTitle) return;
+
+      const currentChat = previousChats.filter(chat => chat.title === currentTitle);
+      currentChat.forEach(msg => {
+        const li = document.createElement('li');
+        const contentDiv = document.createElement('div');
+        const roleTitle = document.createElement('p');
+        const content = document.createElement('p');
+
+        roleTitle.className = 'role-title';
+        roleTitle.textContent = msg.role === 'user' ? 'You' : 'Reasona';
+        content.textContent = msg.content;
+
+        contentDiv.appendChild(roleTitle);
+        contentDiv.appendChild(content);
+
+        li.appendChild(contentDiv);
+        chatMessages.appendChild(li);
+        li.scrollIntoView({ behavior: 'smooth' });
+      });
+    }
+
+    function renderHistory() {
+      chatHistory.innerHTML = '';
+      const uniqueTitles = Array.from(new Set(previousChats.map(chat => chat.title).reverse()));
+
+      uniqueTitles.forEach(title => {
+        const li = document.createElement('li');
+        li.textContent = title;
+        li.onclick = () => {
+          currentTitle = title;
+          emptyChat.style.display = 'none';
+          renderChats();
+        };
+        chatHistory.appendChild(li);
+      });
+    }
+
+    newChatBtn.onclick = () => {
+      currentTitle = null;
+      emptyChat.style.display = 'flex';
+      userInput.value = '';
+    };
+
+    chatForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const text = userInput.value.trim();
+      if (!text) return;
+
+      errorText.textContent = '';
+      emptyChat.style.display = 'none';
+
+      if (!currentTitle) currentTitle = text;
+
+      // Save user message
+      const userMessage = { title: currentTitle, role: 'user', content: text };
+      previousChats.push(userMessage);
+      localStorage.setItem('previousChats', JSON.stringify(previousChats));
+      renderChats();
+
+      userInput.value = 'Processing...';
+      userInput.disabled = true;
+
+      try {
+        const response = await axios.post('/query', { query: text });
+        const botMessage = { title: currentTitle, role: 'bot', content: response.data.answer || 'No answer.' };
+        previousChats.push(botMessage);
+        localStorage.setItem('previousChats', JSON.stringify(previousChats));
+        renderChats();
+      } catch (err) {
+        console.error(err);
+        errorText.textContent = 'Error fetching response.';
+        errorTextHint.textContent = '*Ensure your Flask backend is running.';
+      } finally {
+        userInput.value = '';
+        userInput.disabled = false;
+      }
+
+      renderHistory();
+    };
+
+    renderHistory();
+  </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Dict, Callable, Optional, Tuple
+from typing import List, Dict, Callable, Optional
 
 import faiss
 import numpy as np
@@ -20,26 +20,25 @@ logger = setup_logger(
 
 class RetrievalPipeline:
     """
-    Retrieval pipeline using:
-    - GPU embeddings
-    - FAISS mmap index
-    - SQLite-backed metadata
+    Stateless retrieval pipeline with detailed logging.
+    API-first design (Flask / FastAPI ready).
     """
 
     def __init__(self, cfg: RetrievalConfig):
         self.cfg = cfg
-        self.debug = cfg.debug
+        logger.info("Initializing RetrievalPipeline...")
 
-        self.vector_store_dir: Path = Path(cfg.vector_store_dir)
-        self.index_path = self.vector_store_dir / "index.faiss"
-        self.db_path = self.vector_store_dir / "metadata.db"
+        vector_store_dir = Path(cfg.vector_store_dir)
+        self.index_path = vector_store_dir / "index.faiss"
+        self.db_path = vector_store_dir / "metadata.db"
 
         if not self.index_path.exists() or not self.db_path.exists():
+            logger.error("FAISS index or metadata DB not found: %s, %s", self.index_path, self.db_path)
             raise FileNotFoundError(
-                "FAISS index or metadata DB not found. "
-                "Run indexing before retrieval."
+                "FAISS index or metadata DB not found. Run indexing first."
             )
 
+        logger.info("Loading embedder model: %s", cfg.embedding_model)
         self.embedder = Embedder(
             model_name=cfg.embedding_model,
             batch_size=1,
@@ -47,109 +46,81 @@ class RetrievalPipeline:
             log_every=cfg.log_every,
         )
 
+        logger.info("Loading FAISS store from %s", self.index_path)
         self.store = FaissStore(
-            dim=None,                    
+            dim=None,
             index_path=self.index_path,
             db_path=self.db_path,
             nprobe=cfg.nprobe,
             mmap=getattr(cfg, "mmap", True),
         )
         self.store.load()
-
         logger.info(
-            "FAISS loaded | trained=%s | ntotal=%d | nprobe=%d | mmap=%s",
-            self.store.index.is_trained,
+            "FAISS store loaded | ntotal=%d | nprobe=%d | mmap=%s",
             self.store.count_vectors(),
             self.store.index.nprobe,
             self.store.mmap,
         )
 
         self.retriever = Retriever()
+        logger.info("Retriever initialized")
 
-        self._cache: Dict[
-            Tuple[str, int, bool, int],
-            List[Dict],
-        ] = {}
-
-    def query(
+    def execute(
         self,
-        query_text: str,
+        query: str,
         top_k: Optional[int] = None,
         return_scores: bool = True,
         filter_fn: Optional[Callable[[Dict], bool]] = None,
-    ) -> List[Dict]:
+    ) -> Dict[str, object]:
+        """
+        Execute retrieval with logging.
+
+        Returns:
+        {
+            query: str
+            chunks: List[Dict]
+            prompt_input: str
+            stats: Dict
+        }
+        """
+        logger.info("Executing retrieval for query: '%s'", query)
+
+        if not query or not query.strip():
+            logger.warning("Empty query received")
+            raise ValueError("query must be non-empty")
 
         top_k = top_k or self.cfg.top_k
+        logger.info("Top-k set to %d", top_k)
 
-        cache_key = (
-            query_text,
-            top_k,
-            return_scores,
-            id(filter_fn),
-        )
+        logger.info("Embedding query text")
+        query_vector = self.embedder.embed([query]).astype("float32")
 
-        if cache_key in self._cache:
-            return self._cache[cache_key]
-
-        query_vector = self.embedder.embed([query_text]).astype("float32")
-
-        results = self.retriever.retrieve(
+        logger.info("Retrieving top %d chunks from FAISS", top_k)
+        chunks = self.retriever.retrieve(
             query_vector=query_vector,
             k=top_k,
             return_scores=return_scores,
             filter_fn=filter_fn,
             index=self.store,
         )
+        logger.info("Retrieved %d chunks", len(chunks))
 
-        self._cache[cache_key] = results
-        return results
-
-    def run_query(
-        self,
-        query_text: str,
-        top_k: Optional[int] = None,
-    ) -> Dict:
-
-        chunks = self.query(query_text, top_k=top_k)
-        prompt_input = "\n\n".join(c["text"] for c in chunks)
+        prompt_input = self._build_prompt(chunks)
+        logger.info("Built prompt of length %d characters", len(prompt_input))
 
         return {
-            "query": query_text,
+            "query": query,
             "chunks": chunks,
             "prompt_input": prompt_input,
+            "stats": {
+                "top_k": top_k,
+                "num_chunks": len(chunks),
+            },
         }
 
-    def run(self):
-        print("Retrieval pipeline ready. Type a query (or 'exit').")
-
-        while True:
-            try:
-                query_text = input(">> ").strip()
-                if query_text.lower() in {"exit", "quit"}:
-                    break
-                if not query_text:
-                    continue
-
-                result = self.run_query(
-                    query_text,
-                    top_k=self.cfg.top_k,
-                )
-
-                chunks = result["chunks"]
-                print(f"Retrieved {len(chunks)} chunks")
-
-                for i, chunk in enumerate(chunks):
-                    score = chunk.get("score", None)
-                    source = chunk.get("source", "unknown")
-                    text_preview = chunk.get("text", "")[:200].replace("\n", " ")
-                    print(f"[{i}] score={score:.4f} | source={source} | text={text_preview}...")
-
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                logger.exception("Retrieval error")
-                print(f"Error: {e}")
-
+    @staticmethod
+    def _build_prompt(chunks: List[Dict]) -> str:
+        return "\n\n".join(c["text"] for c in chunks)
 
     @staticmethod
     def filter_by_source(source: str) -> Callable[[Dict], bool]:

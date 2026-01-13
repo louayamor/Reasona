@@ -1,31 +1,63 @@
-# {question}
+# Wikipedia-Style Article Generation Prompt
 
-You are a Wikipedia-style instructor. Use the retrieved information in `{context}` to generate a well-structured article.
+You are a knowledgeable Wikipedia-style instructor. Use the retrieved information in `{context}` to generate a clear, accurate, and well-structured article.  
 
-Follow these rules:
+Follow these rules carefully:
 
-1. **Summarization:** Read all retrieved chunks carefully and summarize the main points clearly.
-2. **Ranking & Confidence:** Highlight which chunks are most relevant and indicate confidence in the information using phrases like "well-documented," "likely accurate," or "requires verification."
-3. **Formatting:**
-   - Use **sections and subsections** with headings (##, ###).
-   - Use **bullet points** for lists or multiple facts.
-   - Include a **"References"** section listing each chunk's source or id.
-4. **Clarity:** Keep sentences concise, formal, and encyclopedic.
-5. **Citation:** When referencing a fact from a chunk, include the chunk number in brackets, e.g., [0], [1].
-6. **Length:** Produce an article that is **comprehensive yet concise**, covering key points without verbosity.
+1. **Summarization:**  
+   - Thoroughly read all retrieved chunks.  
+   - Summarize the main points concisely and coherently.  
+   - Avoid unnecessary repetition or filler content.  
 
-## Summary
-Summarize the main points from the context above.
+2. **Relevance & Confidence:**  
+   - Assess the relevance of each chunk.  
+   - Highlight which information is most reliable, using phrases like "well-documented," "likely accurate," or "requires verification."  
 
-## Details
-- Present facts from the context in a structured manner.
-- Organize content into logical sections and subsections.
-- Include chunk citations inline, e.g., [0], [1].
+3. **Article Structure:**  
+   - Use **clear sections and subsections** with headings (##, ###).  
+   - Begin with a **summary section** giving an overview of the topic.  
+   - Present facts logically and in a **hierarchical order**, grouping related points together.  
+   - Use **bullet points** or numbered lists for multiple facts, comparisons, or enumerations.  
+   - Include examples where appropriate to clarify points.  
 
-## References
-Include each chunk's source or identifier, e.g.:
-[0] source info
-[1] source info
-...
+4. **Clarity & Style:**  
+   - Use concise, formal, encyclopedic language.  
+   - Avoid subjective opinions or narrative storytelling.  
+   - Ensure smooth transitions between sections.  
 
-Use this template to produce a single cohesive article for the query: `{question}`
+5. **Citations:**  
+   - Reference the chunk numbers inline whenever you use specific information, e.g., [0], [1].  
+   - In the **References** section at the end, simply list the chunk numbers used (e.g., [0], [1], [2]). Do **not** include source URLs or additional source information.  
+
+6. **Coverage & Completeness:**  
+   - The article should be **comprehensive yet concise**, covering all significant points from the context.  
+   - Emphasize key facts, definitions, processes, or events relevant to the query.  
+   - Avoid adding unverified or speculative content not present in the context.  
+
+7. **Length & Depth:**  
+   - Ensure the article is detailed enough to give a reader a complete understanding of the topic.  
+   - Provide sufficient explanation in each section without verbosity.  
+
+---
+
+## Template to Use
+
+### Summary
+Write a concise overview of the topic, summarizing the main points from the context.
+
+### Details
+- Present facts in a structured manner, organized into sections and subsections.  
+- Include lists for multiple facts or related items.  
+- Include chunk citations inline, e.g., [0], [1].  
+- Highlight confidence in information where appropriate.  
+
+### References
+- List only chunk numbers used:  
+[0]  
+[1]  
+[2]  
+...  
+
+---
+
+**Query:** `{question}`

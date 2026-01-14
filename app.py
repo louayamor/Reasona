@@ -32,7 +32,7 @@ def index():
 
 @app.route("/query", methods=["POST"])
 def query():
-    """Forward queries from frontend to ReasonaService and return string answer"""
+    """Forward queries from frontend to ReasonaService and return JSON object"""
     try:
         data = request.get_json(force=True)
         query_text = data.get("query")
@@ -44,11 +44,15 @@ def query():
 
         answer = response.get("answer")
         if isinstance(answer, dict):
-            answer = answer.get("text") if "text" in answer else str(answer)
+            answer = answer.get("text") or str(answer)
         elif not isinstance(answer, str):
             answer = str(answer)
 
-        return jsonify({"answer": answer})
+        return jsonify({
+            "query": query_text,
+            "answer": answer,
+            "metadata": response.get("metadata", {}) 
+        })
 
     except Exception as e:
         logger.exception("Query endpoint error")
@@ -56,6 +60,7 @@ def query():
             "error": str(e),
             "trace": traceback.format_exc()
         }), 500
+
 
 
 @app.route("/health", methods=["GET"])

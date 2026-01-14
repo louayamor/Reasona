@@ -82,7 +82,6 @@ class InferencePipeline:
         ):
             start_time = time.time()
 
-            # Step 1: Reranking
             t0 = time.time()
             logger.info("Executing RerankingPipeline...")
             reranked = self.reranking_pipeline.execute(query)
@@ -93,7 +92,6 @@ class InferencePipeline:
                 latency_rerank,
             )
 
-            # Step 2: Build prompt
             prompt = self.prompt_template.format(
                 context=reranked["prompt_input"],
                 question=query,
@@ -105,7 +103,6 @@ class InferencePipeline:
                 filename=f"{run_name}_prompt.txt",
             )
 
-            # Step 3: Generation
             t1 = time.time()
             logger.info("Generating answer with Generator model...")
             answer = self.generator.generate(prompt)
@@ -120,7 +117,6 @@ class InferencePipeline:
 
             latency_total = time.time() - start_time
 
-            # Step 4: Log params & metrics
             self.mlflow.log_params({
                 "query": query,
                 "num_chunks": len(reranked["chunks"]),

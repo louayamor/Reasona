@@ -1,18 +1,22 @@
-# Reasona
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff) ![HuggingFace](https://img.shields.io/badge/HuggingFace-F18C00?logo=huggingface&logoColor=fff) ![SentenceTransformers](https://img.shields.io/badge/SentenceTransformers-FF6F61?logo=transformers&logoColor=fff) ![FAISS](https://img.shields.io/badge/FAISS-3C3C3C?logo=faiss&logoColor=fff) ![Flask](https://img.shields.io/badge/Flask-000000?logo=flask&logoColor=fff) ![DVC](https://img.shields.io/badge/DVC-007ACC?logo=dvc&logoColor=fff) ![DagsHub](https://img.shields.io/badge/DagsHub-FF7F50?logo=dagshub&logoColor=fff) ![MLflow](https://img.shields.io/badge/MLflow-00BFFF?logo=mlflow&logoColor=fff)
 
-**Reasona** is a modular AI/ML pipeline framework designed for **streaming, preprocessing, embedding, indexing and inference** on large-scale datasets. It is optimized for **streaming-first workflows**, allowing end-to-end processing without intermediate storage, while supporting vector-based retrieval and transformer-based inference.
+
+
+**Reasona** is a modular AI/ML pipeline framework for **streaming, preprocessing, embedding, indexing, retrieval, reranking, and inference** on large-scale datasets. It supports **streaming-first workflows** to process data end-to-end efficiently, with vector-based retrieval and transformer-based inference, and a Flask web app for interactive usage.
 
 ---
 
 ## Features
 
-* **Streaming Data Ingestion**: Stream large datasets directly from [Hugging Face Datasets] without downloading entire files.
-* **Data Cleaning & Transformation**: Remove duplicates, handle missing values, and format data into instruction-based JSON suitable for embedding.
-* **Chunking & Embedding**: Break long documents into configurable chunks (with optional overlap) and embed using [SentenceTransformers].
-* **Vector Indexing**: Store embeddings in [FAISS] for fast similarity search and retrieval.
-* **Retrieval & Inference**: Perform top-k search over embeddings and support inference using pretrained transformer models.
-* **Scalable & Configurable**: Centralized YAML configuration for preprocessing, indexing, retrieval, training, and inference.
-* **Logging & Monitoring**: JSON-based logs with progress, checkpoints, and runtime metrics for each pipeline stage.
+* **Streaming Data Ingestion**: Stream large datasets directly from [Hugging Face Datasets] or Wikimedia without downloading entire files.
+* **Data Cleaning & Transformation**: Remove duplicates, handle missing values, and convert to instruction-based JSON for embedding.
+* **Chunking & Embedding**: Split long documents into configurable chunks with optional overlap; embed using [SentenceTransformers].
+* **Vector Indexing**: Store embeddings in [FAISS] for fast similarity search.
+* **Retrieval & Reranking**: Retrieve top-k results via FAISS and optionally rerank results using transformer-based models.
+* **Inference**: Generate answers using pretrained models with configurable parameters.
+* **Flask Web App**: Interactive interface for querying Reasona pipelines, managing chats, and visualizing results.
+* **Scalable & Configurable**: Centralized YAML configuration for all pipelines.
+* **Logging & Monitoring**: JSON logs and runtime metrics for all stages, including checkpoints and progress tracking.
 
 ---
 
@@ -27,27 +31,31 @@ Reasona/
 │       │   ├── config_manager.py
 │       │   └── params.yaml
 │       ├── data/
-│       │   ├── loader.py          # StreamingDatasetLoader
-│       │   ├── cleaner.py         # Data cleaning utilities
-│       │   ├── formatter.py       # DataFormatter
-│       │   ├── chunker.py         # TextChunker for embeddings
-│       │   └── embedder.py        # SentenceTransformers embedding
+│       │   ├── loader.py         
+│       │   ├── cleaner.py         
+│       │   ├── formatter.py      
+│       │   ├── chunker.py        
+│       │   └── embedder.py        
 │       ├── pipeline/
-│       │   ├── preprocess_pipeline.py  # Producer (streaming + preprocessing)
-│       │   ├── indexing_pipeline.py    # Consumer (chunking + embedding + FAISS)
-│       │   ├── training_pipeline.py    # Training LoRA models
-│       │   └── inference_pipeline.py   # Inference & retrieval
+│       │   ├── preprocess_pipeline.py   # Streaming + preprocessing
+│       │   ├── indexing_pipeline.py     # Chunking + embedding + FAISS
+│       │   ├── reranking_pipeline.py    # Transformer reranking
+│       │   ├── inference_pipeline.py    # Inference & retrieval
+│       │   └── training_pipeline.py     # Qwen/Qwen2.5-1.5B-Instruct
 │       ├── vectorstore/
-│       │   └── faiss_store.py          # FAISS integration
+│       │   └── faiss_store.py          
+│       ├── services/
+│       │   └── reasona_service.py      
 │       └── utils/
-│           ├── logger.py               # Logging utilities
-│           └── helpers.py              # Misc helpers
+│           ├── logger.py               
+│           └── helpers.py              
 ├── config/
-│   ├── config.yaml                     # Main pipeline configuration
-│   └── params.yaml                     # Parameters like chunk size, batch size
-├── artifacts/                           # Saved models, embeddings, vector stores
-├── logs/                                # JSON log files
-├── main.py                              # Entry point for preprocessing + indexing
+│   ├── config.yaml                     
+│   └── params.yaml                     
+├── artifacts/                           
+├── logs/                                
+├── main.py                              
+├── app.py                               
 └── README.md
 ```
 
@@ -80,18 +88,20 @@ pip install -r requirements.txt
 
 ## Configuration
 
-All pipelines are controlled via `config/config.yaml` and `config/params.yaml`.
-Key sections:
+Control pipelines via `config/config.yaml` and `config/params.yaml`. Key sections:
 
-* **preprocess**: dataset name, split, max samples, batch size, shuffle and prefetch buffers.
+* **preprocess**: dataset, split, max samples, batch size, shuffle, prefetch buffer.
 * **indexing**: embedding model, chunk size/overlap, batch size, queue size, vector store directory, checkpoint frequency.
-* **retrieval**: top-k results, embedding model, vector store directory.
+* **reranking**: reranker model, tokenizer, top-k reranking.
+* **retrieval**: top-k results, embedding model, vector store path.
 * **inference**: model path, tokenizer path, engine type, max tokens, temperature.
+* **flask**: host, port, debug mode.
 
+---
 
 ## Usage
 
-### Run Preprocessing + Indexing (Producer → Consumer)
+### Preprocessing + Indexing (Streaming Mode)
 
 ```bash
 python main.py
@@ -101,55 +111,57 @@ Pipeline flow:
 
 1. **Preprocessing Pipeline (Producer)**
 
-   * Streams data from Hugging Face.
-   * Cleans and formats into instruction-based JSON.
-   * Stops automatically when `max_samples` is reached.
+   * Streams data from Hugging Face or Wikimedia.
+   * Cleans, formats, and converts to instruction-based JSON.
+   * Stops at `max_samples`.
 
 2. **Indexing Pipeline (Consumer)**
 
-   * Chunks data with configurable overlap.
+   * Chunks data.
    * Embeds chunks using `SentenceTransformers`.
-   * Stores vectors in FAISS and saves checkpoints.
+   * Stores vectors in FAISS with checkpoints.
 
-> Both pipelines run in **streaming mode** and communicate through queues to handle large datasets efficiently.
+> Pipelines communicate via queues to handle large datasets efficiently.
 
-### Training & Inference
-
-Configure `config.yaml` for your model, then run:
+### Reranking & Inference
 
 ```bash
-python src/Reasona/pipeline/training_pipeline.py
+python src/Reasona/pipeline/reranking_pipeline.py
 python src/Reasona/pipeline/inference_pipeline.py
 ```
+
+* Retrieve top-k results from FAISS.
+* Optionally rerank using transformer models.
+* Generate answers or code snippets.
+
+### Run Flask App
+
+```bash
+python app.py
+```
+
+* Access interactive web interface at `http://localhost:5000`.
+* Query datasets, retrieve top-k results, and perform inference.
 
 ---
 
 ## Supported Datasets
 
 * Hugging Face Datasets (streamable)
-* [`PleIAs/SYNTH`](https://huggingface.co/datasets/PleIAs/SYNTH)
-* `wikimedia/wikipedia` (configurable language versions)
+* [`wikimedia/wikipedia`](https://huggingface.co/datasets/wikimedia/wikipedia)
 
 ---
 
 ## Logging & Monitoring
 
-* JSON-based logs for each pipeline:
+* JSON-based logs:
 
   * `logs/pipeline/preprocess_pipeline.json`
   * `logs/pipeline/indexing_pipeline.json`
-  * `logs/pipeline/main_pipeline.log`
-* Logs include progress, checkpoint saving, runtime, and embedding statistics.
+  * `logs/pipeline/reranking_pipeline.json`
+  * `logs/pipeline/inference_pipeline.json`
 
----
-
-## Tools & Libraries Used
-
-* **Python 3.10+**
-* [Hugging Face Datasets](https://huggingface.co/docs/datasets) – streaming and processing large datasets
-* [SentenceTransformers](https://www.sbert.net/) – embeddings
-* [FAISS](https://github.com/facebookresearch/faiss) – vector storage and search
-* [PyYAML](https://pyyaml.org/) – configuration management
+* Logs include progress, checkpoints, runtime, and embedding statistics.
 
 ---
 

@@ -13,7 +13,6 @@ logger = setup_logger(
 
 class ReasonaService:
 
-
     def __init__(self, inference_pipeline: InferencePipeline):
         self.inference_pipeline = inference_pipeline
         logger.info("ReasonaService initialized with InferencePipeline")

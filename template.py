@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 import logging
 
-# Logging config
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s]: %(message)s:'
@@ -10,123 +9,73 @@ logging.basicConfig(
 
 project_name = "Reasona"
 
-# ---------------------------------------------------------------------
-# LOGS FOLDER STRUCTURE
-# ---------------------------------------------------------------------
 logs_dirs = [
     "logs",
-    "logs/training",
+    "logs/pipeline",
     "logs/data",
-    "logs/inference",
     "logs/system"
 ]
+for d in logs_dirs:
+    os.makedirs(d, exist_ok=True)
+    logging.info(f"Created log directory: {d}")
 
-for log_dir in logs_dirs:
-    os.makedirs(log_dir, exist_ok=True)
-    logging.info(f"Created log directory: {log_dir}")
-
-# ---------------------------------------------------------------------
-# ARTIFACTS FOLDER STRUCTURE
-# ---------------------------------------------------------------------
 artifacts_dirs = [
     "artifacts",
-    "artifacts/data_ingestion",
-    "artifacts/data_validation",
-    "artifacts/data_cleaning",
-    "artifacts/data_formatting",
-    "artifacts/data_split",
-    "artifacts/training",
+    "artifacts/data",
+    "artifacts/vectorstore",
     "artifacts/model",
-    "artifacts/model/lora",
-    "artifacts/model/merged",
-    "artifacts/evaluation",
-    "artifacts/inference",
 ]
+for d in artifacts_dirs:
+    os.makedirs(d, exist_ok=True)
+    logging.info(f"Created artifacts directory: {d}")
 
-for art_dir in artifacts_dirs:
-    os.makedirs(art_dir, exist_ok=True)
-    logging.info(f"Created artifacts directory: {art_dir}")
-
-# ---------------------------------------------------------------------
-# PROJECT FILE STRUCTURE
-# ---------------------------------------------------------------------
 list_of_files = [
-    # Core project structure
     f"src/{project_name}/__init__.py",
+
+    f"src/{project_name}/config/__init__.py",
+    f"src/{project_name}/config/config_manager.py",
+    f"src/{project_name}/config/params.yaml",
+
     f"src/{project_name}/data/__init__.py",
     f"src/{project_name}/data/loader.py",
     f"src/{project_name}/data/cleaner.py",
     f"src/{project_name}/data/formatter.py",
-
-    f"src/{project_name}/training/__init__.py",
-    f"src/{project_name}/training/train_lora.py",
-    f"src/{project_name}/training/config.py",
-
-    f"src/{project_name}/model/__init__.py",
-    f"src/{project_name}/model/base_loader.py",
-    f"src/{project_name}/model/merge.py",
-    f"src/{project_name}/model/export.py",
-
-    f"src/{project_name}/inference/__init__.py",
-    f"src/{project_name}/inference/local_server.py",
-    f"src/{project_name}/inference/generate.py",
-
-    f"src/{project_name}/utils/__init__.py",
-    f"src/{project_name}/utils/helpers.py",
-    f"src/{project_name}/utils/logger.py",
+    f"src/{project_name}/data/chunker.py",
+    f"src/{project_name}/data/embedder.py",
 
     f"src/{project_name}/pipeline/__init__.py",
     f"src/{project_name}/pipeline/preprocess_pipeline.py",
+    f"src/{project_name}/pipeline/indexing_pipeline.py",
     f"src/{project_name}/pipeline/training_pipeline.py",
     f"src/{project_name}/pipeline/inference_pipeline.py",
 
-    # Configs
+    f"src/{project_name}/vectorstore/__init__.py",
+    f"src/{project_name}/vectorstore/faiss_store.py",
+
+    f"src/{project_name}/utils/__init__.py",
+    f"src/{project_name}/utils/logger.py",
+    f"src/{project_name}/utils/helpers.py",
+
     "config/config.yaml",
-    "params.yaml",
-    "dataset_schema.yaml",
+    "config/params.yaml",
 
-    # Main application entrypoints
     "main.py",
-    "app.py",
 
-    # Deployment / Packaging
-    "Dockerfile",
-    "requirements.txt",
-    "setup.py",
-
-    # Research & Jupyter
-    "research/experiments.ipynb",
-    "research/dataset_preview.ipynb",
-
-    # Web UI templates
     "templates/index.html",
 
-    # Tests
-    "tests/test_data_pipeline.py",
-    "tests/test_training.py",
-    "tests/test_inference.py",
-
-    # CLI
-    "cli.py",
-
-    # Documentation
     "README.md",
 ]
 
-# ---------------------------------------------------------------------
-# FILE CREATION LOOP
-# ---------------------------------------------------------------------
 for filepath in list_of_files:
-    filepath = Path(filepath)
-    filedir, filename = os.path.split(filepath)
+    path = Path(filepath)
+    dirpath = path.parent
+    if dirpath and not dirpath.exists():
+        os.makedirs(dirpath, exist_ok=True)
+        logging.info(f"Ensured directory: {dirpath}")
 
-    if filedir != "":
-        os.makedirs(filedir, exist_ok=True)
-        logging.info(f"Creating directory: {filedir} for file: {filename}")
-
-    if not filepath.exists() or filepath.stat().st_size == 0:
-        with open(filepath, "w") as f:
+    if not path.exists() or path.stat().st_size == 0:
+        with open(path, "w") as f:
             pass
-        logging.info(f"Created empty file: {filepath}")
+        logging.info(f"Created empty file: {path}")
     else:
-        logging.info(f"File already exists: {filename}")
+        logging.info(f"File exists: {path}")

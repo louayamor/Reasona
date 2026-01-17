@@ -131,7 +131,7 @@ class ConfigurationManager:
                 repetition_penalty=float(gen_cfg.get("repetition_penalty", 1.05)),
 
                 # quantization hf 4-bit
-                load_in_4bit=bool(gen_cfg.get("load_in_4bit", True)),
+                load_in_4bit=bool(gen_cfg.get("load_in_4bit")),
                 quant_type=gen_cfg.get("quant_type", "nf4"),
                 compute_dtype=gen_cfg.get("compute_dtype", "float16"),
                 double_quant=bool(gen_cfg.get("double_quant", True)),

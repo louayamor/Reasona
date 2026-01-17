@@ -21,3 +21,4 @@ accelerate
 bitsandbytes
 mlflow>=2.7,<3
 dagshub
+boto3

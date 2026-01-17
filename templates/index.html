@@ -14,15 +14,13 @@
 <body>
   <div class="container">
     <!-- Sidebar -->
-    <section class="sidebar" id="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-header" id="newChatBtn">
         <span>+</span>
         <button>New Chat</button>
       </div>
 
-      <div class="sidebar-history" id="chatHistory">
-        <!-- Chat history will be injected here -->
-      </div>
+      <ul class="sidebar-history" id="chatHistory"></ul>
 
       <div class="sidebar-info">
         <div class="sidebar-info-upgrade">
@@ -34,19 +32,21 @@
           <p>User</p>
         </div>
       </div>
-    </section>
+    </aside>
 
     <!-- Main content -->
-    <section class="main">
+    <main class="main">
+      <!-- Empty Chat Placeholder -->
       <div id="emptyChat" class="empty-chat-container">
         <img src="{{ url_for('static', filename='assets/images/chatgpt-logo.svg') }}" width="45" height="45" alt="Reasona" />
         <h1>Reasona</h1>
         <h3>How can I help you today?</h3>
       </div>
 
-      <div class="main-header" id="chatMessages">
-      </div>
+      <!-- Chat Messages -->
+      <ul class="main-header" id="chatMessages"></ul>
 
+      <!-- Bottom Input / Errors -->
       <div class="main-bottom">
         <p id="errorText" class="errorText"></p>
         <p id="errorTextHint"></p>
@@ -56,7 +56,7 @@
         </form>
         <p>Reasona can make mistakes. Consider checking important information.</p>
       </div>
-    </section>
+    </main>
   </div>
 
   <script>
@@ -72,6 +72,7 @@
     let currentTitle = null;
     let previousChats = JSON.parse(localStorage.getItem('previousChats') || '[]');
 
+    // Render chat messages
     function renderChats() {
       chatMessages.innerHTML = '';
       if (!currentTitle) return;
@@ -79,23 +80,28 @@
       const currentChat = previousChats.filter(chat => chat.title === currentTitle);
       currentChat.forEach(msg => {
         const li = document.createElement('li');
-        const contentDiv = document.createElement('div');
         const roleTitle = document.createElement('p');
-        const content = document.createElement('p');
+        const content = document.createElement('pre');
 
         roleTitle.className = 'role-title';
         roleTitle.textContent = msg.role === 'user' ? 'You' : 'Reasona';
-        content.textContent = msg.content;
 
-        contentDiv.appendChild(roleTitle);
-        contentDiv.appendChild(content);
+        // Pretty-print JSON objects
+        if (typeof msg.content === 'object') {
+          content.textContent = JSON.stringify(msg.content, null, 2);
+        } else {
+          content.textContent = msg.content;
+        }
+        content.style.whiteSpace = 'pre-wrap';
 
-        li.appendChild(contentDiv);
+        li.appendChild(roleTitle);
+        li.appendChild(content);
         chatMessages.appendChild(li);
         li.scrollIntoView({ behavior: 'smooth' });
       });
     }
 
+    // Render chat history in sidebar
     function renderHistory() {
       chatHistory.innerHTML = '';
       const uniqueTitles = Array.from(new Set(previousChats.map(chat => chat.title).reverse()));
@@ -112,12 +118,14 @@
       });
     }
 
+    // Start a new chat
     newChatBtn.onclick = () => {
       currentTitle = null;
       emptyChat.style.display = 'flex';
       userInput.value = '';
     };
 
+    // Handle form submission
     chatForm.onsubmit = async (e) => {
       e.preventDefault();
       const text = userInput.value.trim();
@@ -139,7 +147,14 @@
 
       try {
         const response = await axios.post('/query', { query: text });
-        const botMessage = { title: currentTitle, role: 'bot', content: response.data.answer || 'No answer.' };
+        let botContent = response.data.answer || 'No answer.';
+
+        // If answer is object, format JSON nicely
+        if (typeof botContent === 'object') {
+          botContent = JSON.stringify(botContent, null, 2);
+        }
+
+        const botMessage = { title: currentTitle, role: 'bot', content: botContent };
         previousChats.push(botMessage);
         localStorage.setItem('previousChats', JSON.stringify(previousChats));
         renderChats();
@@ -155,6 +170,7 @@
       renderHistory();
     };
 
+    // Initial render
     renderHistory();
   </script>
 </body>

@@ -50,10 +50,10 @@ inference:
   generator:
     provider: hf
     model: "Qwen/Qwen2.5-1.5B-Instruct"
-    max_tokens: 512
-    temperature: 0.85
-    top_p: 0.9
-    repetition_penalty: 1.1
+    max_tokens: 512 
+    temperature: 0.7
+    top_p: 0.85
+    repetition_penalty: 1.05
     load_in_4bit: true
     device_map: "auto"
     compute_dtype: float16

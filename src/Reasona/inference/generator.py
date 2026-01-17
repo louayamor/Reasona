@@ -64,6 +64,8 @@ class Generator:
             temperature=self.cfg.temperature,
             top_p=self.cfg.top_p,
             repetition_penalty=self.cfg.repetition_penalty,
+            no_repeat_ngram_size=4,
+            early_stopping=True,
             do_sample=True,
         )
 
